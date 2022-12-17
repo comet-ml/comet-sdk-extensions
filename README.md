@@ -1,6 +1,6 @@
 # cometx
 
-Open source extensions for comet_ml.
+Open source extensions for the [Comet](https://www.comet.com/site/?utm_source=cometx&utm_medium=referral&utm_campaign=cometx_2022&utm_content=github) SDK.
 
 These extensions are created and supported by the community and are
 not an official project of Comet ML. We welcome contributions!
