@@ -8,7 +8,7 @@ not an official project of Comet ML. We welcome contributions!
 ## Installation
 
 ```
-pip install
+pip install git+https://github.com:comet-ml/comet-sdk-extensions.git#egg=cometx
 ```
 
 ## Usage
