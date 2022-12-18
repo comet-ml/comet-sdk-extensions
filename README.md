@@ -11,6 +11,44 @@ not an official project of Comet ML. We welcome contributions!
 pip install git+https://github.com/comet-ml/comet-sdk-extensions.git#egg=cometx
 ```
 
+To use these command-line functions, you'll need to have your Comet
+API key set in one of the following two ways.
+
+1. [Environment variables](https://www.comet.com/docs/v2/guides/tracking-ml-training/configuring-comet/#configure-comet-through-environment-variables)
+2. [Comet config file](https://www.comet.com/docs/v2/guides/tracking-ml-training/configuring-comet/#configure-comet-using-the-comet-config-file)
+
+Either this way:
+
+```
+export COMET_API_KEY="YOUR-COMET-API-KEY"
+```
+
+or this way:
+
+```
+[comet]
+api_key = YOUR-COMET-API-KEY
+```
+
+If you are an Comet on-prem user, you'll also need to set the
+`COMET_URL_OVERRIDE` environment variable, or add it to your
+`~/.comet.config` file as below:
+
+Either this way:
+
+```
+export COMET_API_KEY="YOUR-COMET-API-KEY"
+export COMET_URL_OVERRIDE="https://your-companys-comet.com/clientlib/"
+```
+
+or this way:
+
+```
+[comet]
+api_key = YOUR-COMET-API-KEY
+url_override = https://your-companys-comet.com/clientlib/
+```
+
 ## Usage
 
 There are three subcommands:
