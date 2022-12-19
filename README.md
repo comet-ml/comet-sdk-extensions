@@ -14,8 +14,8 @@ pip install git+https://github.com/comet-ml/comet-sdk-extensions.git#egg=cometx
 To use these command-line functions, you'll need to have your Comet
 API key set in one of the following two ways.
 
-1. [Environment variables](https://www.comet.com/docs/v2/guides/tracking-ml-training/configuring-comet/#configure-comet-through-environment-variables)
-2. [Comet config file](https://www.comet.com/docs/v2/guides/tracking-ml-training/configuring-comet/#configure-comet-using-the-comet-config-file)
+1. [Environment variables](https://www.comet.com/docs/v2/guides/tracking-ml-training/configuring-comet/?utm_source=cometx&utm_medium=referral&utm_campaign=cometx_2022&utm_content=github#configure-comet-through-environment-variables)
+2. [Comet config file](https://www.comet.com/docs/v2/guides/tracking-ml-training/configuring-comet/?utm_source=cometx&utm_medium=referral&utm_campaign=cometx_2022&utm_content=github#configure-comet-using-the-comet-config-file)
 
 Either this way:
 
