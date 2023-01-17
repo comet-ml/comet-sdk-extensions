@@ -159,7 +159,7 @@ def log_cli(parsed_args):
                 experiment._log_asset(
                     binary_io,
                     file_name=filename,
-                    copy_to_tmp=False,
+                    copy_to_tmp=True,  # NOTE: comet_ml no longer support False
                     asset_type=comet_log_type,
                 )
             elif comet_log_type == "datagrid":
