@@ -1066,6 +1066,40 @@ class DownloadManager:
                 with open(file_path, "wb+") as f:
                     f.write(raw)
 
+    def download_asset(self, experiment, asset_filename):
+        # type: (APIExperiment) -> None
+        """
+        Given an APIExperiment and asset name, download the asset.
+
+        Args:
+            experiment: (APIExperiment) the experiment
+            asset_filename: (str) name of asset
+        """
+        if self.flat:
+            assets_path = self.root
+        else:
+            assets_path = self.get_experiment_path(experiment, "assets")
+
+        assets = experiment.get_asset_list()
+        for asset in assets:
+            asset_type = asset["type"] if asset["type"] else "asset"
+            if self.flat:
+                path = assets_path
+            else:
+                path = os.path.join(assets_path, asset_type)
+            filename = sanitize_filename(asset["fileName"])
+
+            if filename == asset_filename:
+                file_path = os.path.join(path, filename)
+                # Don't download a filename more than once:
+                if self._should_write(file_path):
+                    self.summary["assets"] += 1
+                    path, filename = os.path.split(file_path)
+                    makedirs(path, exist_ok=True)
+                    raw = experiment.get_asset(asset["assetId"])
+                    with open(file_path, "wb+") as f:
+                        f.write(raw)
+
     def download_experiment(self, experiment, top_level=True):
         # type: (APIExperiment, Optional[bool]) -> None
         """

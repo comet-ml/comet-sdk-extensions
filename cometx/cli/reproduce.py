@@ -49,6 +49,14 @@ def get_parser_arguments(parser):
         action="store_true",
         default=False,
     )
+    parser.add_argument(
+        "--executable",
+        help=(
+            "Run the reproducable script"
+        ),
+        type=str,
+        default="python",
+    )
 
 def reproduce(parsed_args, remaining=None):
     comet_path = (
@@ -79,11 +87,25 @@ def reproduce(parsed_args, remaining=None):
     manager.download_code(experiment)
     manager.download_git(experiment)
     manager.download_requirements(experiment)
+    for asset_filename in [
+            "conda-spec.txt", "conda-info.yml", "conda-environment.yml"
+    ]:
+        manager.download_asset(experiment, asset_filename)
 
-    shell_commands = "cd %s\n" % parsed_args.OUTPUT_DIR
-    shell_commands += "pip install -r requirements.txt\n"
-    shell_commands += manager.get_git_text(experiment)
-    shell_commands += "python ../script.py\n"
+    shell_commands = ""
+    # "cd %s\n" % os.path.abspath(parsed_args.OUTPUT_DIR)
+    if os.path.exists(os.path.join(parsed_args.OUTPUT_DIR, "conda-spec.txt")):
+        shell_commands += "conda create --name reproduced-env --file conda-spec.txt\n"
+        shell_commands += "conda activate reproduced-env\n"
+    if os.path.exists(os.path.join(parsed_args.OUTPUT_DIR, "requirements.txt")):
+        shell_commands += "pip install -r requirements.txt\n"
+    if os.path.exists(os.path.join(parsed_args.OUTPUT_DIR, "git_metadata.json")):
+        shell_commands += manager.get_git_text(experiment)
+        script = "../script.py"
+    else:
+        script = "script.py"
+
+    shell_commands += "%s %s\n" % (parsed_args.executable, script)
 
     shell_script_name = os.path.join(parsed_args.OUTPUT_DIR, "script.sh")
     with open(shell_script_name, "w") as fp:
@@ -94,9 +116,9 @@ def reproduce(parsed_args, remaining=None):
     print("Shell command saved in: %s" % shell_script_name)
     if parsed_args.run:
         print("Running...")
-        os.system("%s" % shell_script_name)
+        os.system("cd %s; %s" % (parsed_args.OUTPUT_DIR, shell_script_name))
     else:
-        print("To run simply execute the script.")
+        print("To run, cd into %s and execute the script." % parsed_args.OUTPUT_DIR)
 
 
 def main(args):
