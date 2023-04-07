@@ -14,6 +14,7 @@
 
 import argparse
 import sys
+import os
 
 from comet_ml.exceptions import InvalidRestAPIKey
 from comet_ml.utils import makedirs
@@ -39,6 +40,14 @@ def get_parser_arguments(parser):
             "The directory to copy files in order to reproduce the experiment"
         ),
         type=str,
+    )
+    parser.add_argument(
+        "--run",
+        help=(
+            "Run the reproducable script"
+        ),
+        action="store_true",
+        default=False,
     )
 
 def reproduce(parsed_args, remaining=None):
@@ -74,7 +83,19 @@ def reproduce(parsed_args, remaining=None):
     shell_commands = "cd %s" % parsed_args.OUTPUT_DIR
     shell_commands += manager.get_git_text(experiment)
     shell_commands += "python ../script.py"
-    print(shell_commands)
+
+    shell_script_name = os.path.join(parsed_args.OUTPUT_DIR, "script.sh")
+    with open(shell_script_name, "w") as fp:
+        fp.write(shell_commands)
+
+    os.system("chmod +x %s" % shell_script_name)
+
+    print("Shell command saved in: %s" % shell_script_name)
+    if parsed_args.run:
+        print("Running...")
+        os.system("%s" % shell_script_name)
+    else:
+        print("To run simply execute the script.")
 
 
 def main(args):
