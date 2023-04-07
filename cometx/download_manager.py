@@ -49,6 +49,11 @@ cd {directory}
 ```
 """
 
+REPRODUCE_CLONE_TEXT = """
+git clone {origin}
+cd {directory}
+"""
+
 README_TEMPLATE = """
 Reproduce git commands
 ---------------------------
@@ -62,6 +67,12 @@ git checkout {parent}
 ```
 """
 
+REPRODUCE_TEMPLATE = """
+{clone_text}
+git checkout {branch}
+git checkout {parent}
+{patch_text}
+"""
 
 def is_same(name1, name2):
     # type: (Any, Any) -> bool
@@ -917,7 +928,7 @@ class DownloadManager:
 
             if git_meta["origin"]:
                 origin = git_meta["origin"]
-                directory = git_meta["origin"].split("/")[1].split(".")[0]
+                directory = git_meta["origin"].split("/")[-1].split(".")[0]
                 clone_text = CLONE_TEXT.format(origin=origin, directory=directory)
                 if git_patch:
                     patch_text = "git apply git_diff.patch"
@@ -935,6 +946,33 @@ class DownloadManager:
                 self.summary["git"] += 1
                 with open(filepath, "w") as f:
                     f.write(template)
+
+    def get_git_text(self, experiment):
+        git_meta = experiment.get_git_metadata()
+        git_patch = experiment.get_git_patch()
+        
+        if git_meta["origin"]:
+            origin = git_meta["origin"]
+            directory = git_meta["origin"].split("/")[-1].split(".")[0]
+            clone_text = REPRODUCE_CLONE_TEXT.format(origin=origin, directory=directory)
+        else:
+            clone_text = ""
+
+        if git_patch:
+            patch_text = "git apply ../git_diff.patch"
+        else:
+            patch_text = ""
+
+        if git_meta["branch"]:
+            git_meta["branch"] = git_meta["branch"].split("/")[-1]
+
+        template = REPRODUCE_TEMPLATE.format(
+            clone_text=clone_text,
+            patch_text=patch_text,
+            branch=git_meta["branch"],
+            parent=git_meta["parent"],
+        )
+        return template
 
     def download_code(self, experiment):
         # type: (APIExperiment) -> None
