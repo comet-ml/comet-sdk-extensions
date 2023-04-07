@@ -80,9 +80,10 @@ def reproduce(parsed_args, remaining=None):
     manager.download_git(experiment)
     manager.download_requirements(experiment)
 
-    shell_commands = "cd %s" % parsed_args.OUTPUT_DIR
+    shell_commands = "cd %s\n" % parsed_args.OUTPUT_DIR
+    shell_commands += "pip install -r requirements.txt\n"
     shell_commands += manager.get_git_text(experiment)
-    shell_commands += "python ../script.py"
+    shell_commands += "python ../script.py\n"
 
     shell_script_name = os.path.join(parsed_args.OUTPUT_DIR, "script.sh")
     with open(shell_script_name, "w") as fp:

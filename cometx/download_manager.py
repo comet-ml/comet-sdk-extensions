@@ -790,10 +790,10 @@ class DownloadManager:
         if self._should_write(filepath):
             details = experiment.get_system_details()
             os_packages = None
-            if "osPackages" in details:
-                os_packages = details["osPackages"]
-            elif "installedPackages" in details:
+            if "installedPackages" in details:
                 os_packages = details["installedPackages"]
+            if not os_packages and "osPackages" in details:
+                os_packages = details["osPackages"]
             if os_packages:
                 self.summary["requirements"] += 1
                 makedirs(path, exist_ok=True)
