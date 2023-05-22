@@ -56,7 +56,7 @@ The subcommands:
 * cometx list
 * cometx download
 * cometx log
-* comet reporoduce
+* comet reproduce
 
 ### cometx list
 
