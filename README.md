@@ -51,11 +51,12 @@ url_override = https://your-companys-comet.com/clientlib/
 
 ## Usage
 
-There are three subcommands:
+The subcommands:
 
 * cometx list
 * cometx download
 * cometx log
+* comet reporoduce
 
 ### cometx list
 
