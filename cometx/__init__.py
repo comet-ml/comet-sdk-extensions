@@ -11,8 +11,6 @@
 #      Team. All rights reserved.
 # ****************************************
 
-from kangas import Audio, Curve, DataGrid, Image, Text, Video  # noqa
-
 from ._version import __version__  # noqa
 from .download_manager import DownloadManager  # noqa
 from .utils import log_datagrid_to_experiment
