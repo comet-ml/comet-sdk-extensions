@@ -11,14 +11,33 @@
 #  Copyright (c) 2022 Cometx Development
 #      Team. All rights reserved.
 # ****************************************
+"""
+Examples:
 
+To log to an experiment or set other key:value to multiple experiments:
+
+$ cometx log WORKSPACE/PROJECT/EXPERIMENT-KEY --type=TYPE FILENAME 
+$ cometx log WORKSPACE/PROJECT --type=other --set "key:value"
+$ cometx log WORKSPACE --type=other --set "key:value"
+
+Where TYPE is one of the following names:
+
+* asset
+* audio
+* code
+* image
+* metrics
+* notebook
+* text-sample
+* video
+"""
 import argparse
 import glob
 import json
 import os
 import sys
 
-from comet_ml import ExistingExperiment, Experiment
+from comet_ml import ExistingExperiment, Experiment, API
 
 from ..utils import get_file_extension
 
@@ -71,6 +90,18 @@ def get_parser_arguments(parser):
         type=str,
         default=None,
     )
+    parser.add_argument(
+        "--set",
+        help="The key:value to log",
+        type=str,
+        default=None,
+    )
+    parser.add_argument(
+        "--debug",
+        help="If given, allow debugging",
+        default=False,
+        action="store_true"
+    )
 
 
 def log(parsed_args, remaining=None):
@@ -80,7 +111,10 @@ def log(parsed_args, remaining=None):
     except KeyboardInterrupt:
         print("Canceled by CONTROL+C")
     except Exception as exc:
-        print("ERROR: " + str(exc))
+        if parsed_args.debug:
+            raise
+        else:
+            print("ERROR: " + str(exc))
 
 
 def log_cli(parsed_args):
@@ -89,15 +123,6 @@ def log_cli(parsed_args):
     else:
         extension = get_file_extension(parsed_args.FILENAME)
         log_type = EXTENSION_MAP.get(extension.lower(), "asset")
-
-    if parsed_args.FILENAME is None:
-        parsed_args.FILENAME, parsed_args.COMET_PATH = (
-            parsed_args.COMET_PATH,
-            parsed_args.FILENAME,
-        )
-
-    if parsed_args.FILENAME is None:
-        raise Exception("Provide a filename to log to experiment")
 
     comet_path = (
         parsed_args.COMET_PATH.split("/") if parsed_args.COMET_PATH is not None else []
@@ -126,10 +151,13 @@ def log_cli(parsed_args):
             project_name=project_name,
         )
     else:
-        experiment = Experiment(
-            workspace=workspace,
-            project_name=project_name,
-        )
+        # add an experiment, or log to a bunch of experiments
+        # allow set to work on more than one
+        if not parsed_args.set:
+            experiment = Experiment(
+                workspace=workspace,
+                project_name=project_name,
+            )
 
     # Try as glob:
     if parsed_args.type == "code":
@@ -139,6 +167,17 @@ def log_cli(parsed_args):
             experiment.log_code(folder=parsed_args.FILENAME)
         else:
             raise Exception("cannot log code: %r; use filename or folder")
+    elif parsed_args.type == "other":
+        if not parsed_args.set or ":" not in parsed_args.set:
+            raise Exception("Logging `other` require --set key:value")
+
+        api = API()
+        
+        key, value = parsed_args.set.split(":", 1)
+        experiments = api.get_experiments(workspace, project_name)
+        for experiment in experiments:
+            experiment.log_other(key, value)
+            
     elif parsed_args.type == "metrics":
         for line in open(parsed_args.FILENAME):
             dict_line = json.loads(line)
