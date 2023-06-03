@@ -25,18 +25,6 @@ from comet_ml.utils import clean_string, get_root_url
 import six
 
 
-def get_comet_type(asset_type):
-    """
-    Mapping from datagrid Asset type to Comet
-    asset type.
-    """
-    if asset_type == "Text":
-        return "text-sample"
-    else:
-        # Audio, Image, Video, Curve, etc.
-        return asset_type.lower()
-
-
 class ProgressBar:
     """
     A simple ASCII progress bar, showing a box for each item.

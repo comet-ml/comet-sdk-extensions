@@ -20,7 +20,7 @@ import sys
 
 from comet_ml import ExistingExperiment, Experiment
 
-from ..utils import get_file_extension, log_datagrid_to_experiment
+from ..utils import get_file_extension
 
 ADDITIONAL_ARGS = False
 # From filename extension to Comet Asset Type
@@ -162,9 +162,6 @@ def log_cli(parsed_args):
                     copy_to_tmp=True,  # NOTE: comet_ml no longer support False
                     asset_type=comet_log_type,
                 )
-            elif comet_log_type == "datagrid":
-                # metadata = FIXME: get metadata dict from args
-                log_datagrid_to_experiment(experiment, filename)
             elif comet_log_type == "notebook":
                 # metadata = FIXME: get metadata dict from args
                 experiment.log_notebook(filename)
