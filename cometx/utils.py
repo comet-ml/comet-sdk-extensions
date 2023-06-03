@@ -83,66 +83,6 @@ def _input_user_yn(prompt):
             break
     return response.startswith("y")
 
-
-def log_datagrid_to_experiment(experiment, filename, output=None):
-    """
-    Create the SQLite database, zip it, and log it to
-    an experiment.
-
-    Args:
-
-    * filename - (str) the name of the datagrid file
-    * output - (optional, str) the name of the output dg
-    """
-    suffix = ".datagrid"
-
-    if output is None:
-        output = tempfile.NamedTemporaryFile(suffix=suffix, delete=False).name
-
-    conn = sqlite3.connect(output)
-    cur = conn.cursor()
-    cur.execute("ATTACH DATABASE '{filename}' as original;".format(filename=filename))
-    cur.execute("CREATE TABLE datagrid AS SELECT * from original.datagrid;")
-    cur.execute("CREATE TABLE metadata AS SELECT * from original.metadata;")
-    conn.commit()
-
-    zip_file = tempfile.NamedTemporaryFile(suffix=".dgz", delete=False).name
-
-    try:
-        # zlib may not be installed
-        with zipfile.ZipFile(zip_file, "w", zipfile.ZIP_DEFLATED) as zipf:
-            zipf.write(output)
-    except Exception:
-        # if not, we'll just package it up as if it were:
-        with zipfile.ZipFile(zip_file, "w") as zipf:
-            zipf.write(output)
-
-    results = experiment._log_asset(zip_file, file_name=filename, asset_type="datagrid")
-
-    # Log all of the assets:
-    rows = conn.execute(
-        "SELECT asset_id, asset_type, asset_data, asset_metadata from original.assets;"
-    )
-    for row in rows.fetchall():
-        # FIXME: make sure asset is not already logged
-        asset_id, asset_type, asset_data, asset_metadata = row
-        metadata = json.loads(asset_metadata)
-        if isinstance(asset_data, str):
-            binary_io = io.StringIO(asset_data)
-        else:
-            binary_io = io.BytesIO(asset_data)
-        file_name = metadata.get("filename", "%s-%s" % (asset_type, asset_id))
-        comet_type = get_comet_type(asset_type)
-        experiment._log_asset(
-            binary_io,
-            file_name=file_name,
-            copy_to_tmp=False,
-            asset_type=comet_type,
-            asset_id=asset_id,
-        )
-    return results
-
-
 def get_file_extension(file_path):
     if file_path is None:
         return None

@@ -13,19 +13,3 @@
 
 from ._version import __version__  # noqa
 from .download_manager import DownloadManager  # noqa
-from .utils import log_datagrid_to_experiment
-
-
-class DataGrid(DataGrid):
-    def log_to_experiment(self, experiment):
-        """
-        Special class for comet_ml to recognize and to allow:
-
-        ```python
-        >>> dg = DataGrid()
-        >>> experiment.log(dg)
-        """
-        if not self.saved:
-            self.save()
-
-        log_datagrid_to_experiment(experiment, self.filename)
