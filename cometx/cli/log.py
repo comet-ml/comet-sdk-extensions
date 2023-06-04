@@ -16,12 +16,15 @@ Examples:
 
 To log to an experiment or set other key:value to multiple experiments:
 
-$ cometx log WORKSPACE/PROJECT/EXPERIMENT-KEY --type=TYPE FILENAME 
+
+$ cometx log WORKSPACE/PROJECT FOLDER --type=all
+$ cometx log WORKSPACE/PROJECT/EXPERIMENT-KEY FILENAME --type=TYPE
 $ cometx log WORKSPACE/PROJECT --type=other --set "key:value"
 $ cometx log WORKSPACE --type=other --set "key:value"
 
 Where TYPE is one of the following names:
 
+* all
 * asset
 * audio
 * code
@@ -30,6 +33,7 @@ Where TYPE is one of the following names:
 * notebook
 * text-sample
 * video
+* other
 """
 import argparse
 import glob
@@ -117,13 +121,24 @@ def log(parsed_args, remaining=None):
             print("ERROR: " + str(exc))
 
 
-def log_cli(parsed_args):
-    if parsed_args.type:
-        log_type = TYPE_MAP.get(parsed_args.type.lower(), parsed_args.type.lower())
-    else:
-        extension = get_file_extension(parsed_args.FILENAME)
-        log_type = EXTENSION_MAP.get(extension.lower(), "asset")
+def create_experiment(workspace, project_name):
+    return Experiment(
+        workspace=workspace,
+        project_name=project_name,
+        log_code=False,
+        auto_param_logging=False,
+        parse_args=False,
+        auto_output_logging=None,
+        log_env_details=False,
+        log_git_metadata=False,
+        log_git_patch=False,
+        log_env_gpu=False,
+        log_env_host=False,
+        log_env_cpu=False,
+    )
 
+def log_cli(parsed_args):
+    experiment = None
     comet_path = (
         parsed_args.COMET_PATH.split("/") if parsed_args.COMET_PATH is not None else []
     )
@@ -150,65 +165,145 @@ def log_cli(parsed_args):
             workspace=workspace,
             project_name=project_name,
         )
-    else:
-        # add an experiment, or log to a bunch of experiments
-        # allow set to work on more than one
-        if not parsed_args.set:
-            experiment = Experiment(
-                workspace=workspace,
-                project_name=project_name,
-            )
 
-    # Try as glob:
-    if parsed_args.type == "code":
-        if os.path.isfile(parsed_args.FILENAME):
-            experiment.log_code(file_name=parsed_args.FILENAME)
-        elif os.path.isdir(parsed_args.FILENAME):
-            experiment.log_code(folder=parsed_args.FILENAME)
-        else:
-            raise Exception("cannot log code: %r; use filename or folder")
+    if parsed_args.type == "all":
+        if not parsed_args.FILENAME:
+            raise Exception("Logging `all` requires a folder")
+
+        if not experiment:
+            experiment = create_experiment(workspace, project_name)
+
+        if os.path.exists(os.path.join(parsed_args.FILENAME, "metrics.jsonl")):
+            log_experiment_metrics_from_file(experiment, os.path.join(parsed_args.FILENAME, "metrics.jsonl"))
+
+        if os.path.exists(os.path.join(parsed_args.FILENAME, "parameters.json")):
+            log_experiment_parameters_from_file(experiment, os.path.join(parsed_args.FILENAME, "parameters.json"))
+
+        if os.path.exists(os.path.join(parsed_args.FILENAME, "others.jsonl")):
+            log_experiment_others_from_file(experiment, os.path.join(parsed_args.FILENAME, "others.jsonl"))
+
+        for dirname in glob.glob(os.path.join(parsed_args.FILENAME, "assets", "*")):
+            if os.path.isdir(dirname):
+                base, asset_type = dirname.rsplit("/", 1)
+                log_experiment_assets_from_file(experiment, os.path.join(parsed_args.FILENAME, "assets", asset_type, "*"), asset_type)
+
+        # FIXME: output
+
+    elif parsed_args.type == "code":
+        if not parsed_args.FILENAME:
+            raise Exception("Logging `code` requires a file or folder")
+
+        if not experiment:
+            experiment = create_experiment(workspace, project_name)
+
+        log_experiment_code_from_file(experiment, parsed_args.FILENAME)
+
     elif parsed_args.type == "other":
-        if not parsed_args.set or ":" not in parsed_args.set:
-            raise Exception("Logging `other` require --set key:value")
+        # two possibilities: log key:value to set of experiments; log filename to experiment
+        if parsed_args.FILENAME:
+            if not experiment:
+                experiment = create_experiment(workspace, project_name)
 
-        api = API()
-        
+            log_experiment_others_from_file(experiment, parsed_args.FILENAME)
+            return
+
+        elif not parsed_args.set or ":" not in parsed_args.set:
+            raise Exception("Logging `other` without FILENAME requires --set key:value")
+
         key, value = parsed_args.set.split(":", 1)
-        experiments = api.get_experiments(workspace, project_name)
-        for experiment in experiments:
-            experiment.log_other(key, value)
-            
-    elif parsed_args.type == "metrics":
-        for line in open(parsed_args.FILENAME):
-            dict_line = json.loads(line)
-            name = dict_line["metricName"]
-            value = dict_line["metricValue"]
-            step = dict_line["step"]
-            epoch = dict_line["epoch"]
-            # FIXME: does not log time
-            experiment.log_metric(name=name, value=value, step=step, epoch=epoch)
-    else:
-        SKELETON = parsed_args.FILENAME
-        for filename in glob.glob(SKELETON):
-            comet_log_type = TYPE_MAP.get(log_type, log_type)
-            if comet_log_type in ["image", "text-sample", "asset", "video", "audio"]:
-                # metadata = FIXME: get metadata dict from args
-                binary_io = open(filename, "rb")
+        if experiment:
+            experiments = [experiment]
+        else:
+            experiments = api.get_experiments(workspace, project_name)
+        set_experiments_other(workspace, project_name, key, value)
 
-                experiment._log_asset(
-                    binary_io,
-                    file_name=filename,
-                    copy_to_tmp=True,  # NOTE: comet_ml no longer support False
-                    asset_type=comet_log_type,
-                )
-            elif comet_log_type == "notebook":
-                # metadata = FIXME: get metadata dict from args
-                experiment.log_notebook(filename)
-            else:
-                raise print("ERROR: Unable to log type: %r" % parsed_args.type)
+    elif parsed_args.type == "metrics":
+        if not parsed_args.FILENAME:
+            raise Exception("Logging `metrics` requires a file")
+
+        if not experiment:
+            experiment = create_experiment(workspace, project_name)
+
+        log_experiment_metrics_from_file(experiment, parsed_args.FILENAME)
+
+    elif parsed_args.type == "parameters":
+        if not parsed_args.FILENAME:
+            raise Exception("Logging `parameters` requires a file")
+
+        if not experiment:
+            experiment = create_experiment(workspace, project_name)
+
+        log_experiment_parameters_from_file(experiment, parsed_args.FILENAME)
+
+    else:
+        if not parsed_args.FILENAME:
+            raise Exception("Logging an asset requires a file")
+
+        if not experiment:
+            experiment = create_experiment(workspace, project_name)
+
+        log_experiment_assets_from_file(experiment, parsed_args.FILENAME, parsed_args.type)
 
     experiment.end()
 
+def log_experiment_assets_from_file(experiment, filename, file_type):
+    SKELETON = filename
+    for filename in glob.glob(SKELETON):
+        if not file_type:
+            extension = get_file_extension(filename)
+            file_type = EXTENSION_MAP.get(extension.lower(), "asset")
+
+        if file_type == "notebook":
+            # metadata = FIXME: get metadata dict from args
+            experiment.log_notebook(filename)
+        else:
+            # metadata = FIXME: get metadata dict from args
+            binary_io = open(filename, "rb")
+
+            experiment._log_asset(
+                binary_io,
+                file_name=filename,
+                copy_to_tmp=True,  # NOTE: comet_ml no longer support False
+                asset_type=file_type,
+            )
+
+def log_experiment_code_from_file(experiment, filename):
+    if os.path.isfile(filename):
+        experiment.log_code(filename)
+    elif os.path.isdir(filename):
+        experiment.log_code(folder=filename)
+    else:
+        raise Exception("cannot log code: %r; use filename or folder" % filename)
+
+def set_experiments_other(experiments, key, value):
+    api = API()
+
+    for experiment in experiments:
+        experiment.log_other(key, value)
+
+def log_experiment_metrics_from_file(experiment, filename):
+    for line in open(filename):
+        dict_line = json.loads(line)
+        name = dict_line["metricName"]
+        value = dict_line["metricValue"]
+        step = dict_line["step"]
+        epoch = dict_line["epoch"]
+        # FIXME: does not log time
+        experiment.log_metric(name=name, value=value, step=step, epoch=epoch)
+
+def log_experiment_parameters_from_file(experiment, filename):
+    parameters = json.load(open(filename))
+    for parameter in parameters:
+        name = parameter["name"]
+        value = parameter["valueCurrent"]
+        experiment.log_parameter(name, value)
+
+def log_experiment_others_from_file(experiment, filename):
+    for line in open(filename):
+        dict_line = json.loads(line)
+        name = dict_line["name"]
+        value = dict_line["valueCurrent"]
+        experiment.log_other(key=name, value=value)
 
 def main(args):
     parser = argparse.ArgumentParser(
