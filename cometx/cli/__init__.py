@@ -18,6 +18,7 @@ Examples:
     cometx log
     cometx list
     cometx reproduce
+    cometx delete
 
 For more information:
     cometx COMMAND --help
@@ -28,7 +29,7 @@ import sys
 from cometx import __version__
 
 # Import CLI commands:
-from . import download, list_command, log, reproduce
+from . import download, list_command, log, reproduce, delete
 
 
 def add_subparser(subparsers, module, name):
@@ -69,6 +70,7 @@ def main(raw_args=sys.argv[1:]):
     # Register CLI commands:
     add_subparser(subparsers, download, "download")
     add_subparser(subparsers, log, "log")
+    add_subparser(subparsers, delete, "delete")
     add_subparser(subparsers, list_command, "list")
     add_subparser(subparsers, reproduce, "reproduce")
 
