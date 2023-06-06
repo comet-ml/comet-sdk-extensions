@@ -57,6 +57,7 @@ The subcommands:
 * cometx download
 * cometx log
 * comet reproduce
+* comet delete
 
 ### cometx list
 
@@ -169,6 +170,48 @@ Known types:
 * video
 * ipynb
 * audio
+
+Example to set an other key:value:
+
+```
+cometx log WORKSPACE/PROJECT --type other --set "key:value"
+cometx log WORKSPACE/PROJECT/EXPERIMENT-KEY-OR-NAME --type other --set "key:value"
+```
+The first version will set the other key:value in all experiments in a project, and the second will set the other key:value in the experiment.
+
+
+Example to log all items:
+
+```
+cometx log WORKSPACE/PROJECT PATH-TO-DOWNLOAD --type all
+cometx log WORKSPACE/PROJECT/EXPERIMENT-KEY-OR-NAME PATH-TO-DOWNLOAD --type all
+```
+The first version will create an experiment, and the second will log everything to an existing experiment.
+
+### cometx delete
+
+To delete experiments assets:
+
+```
+cometx delete WORKSPACE/PROJECT --type=image
+cometx delete WORKSPACE/PROJECT/EXPERIMENT --type=all
+```
+Type can be valid asset tupe, including:
+
+* all
+* asset
+* audio
+* code
+* image
+* notebook
+* text-sample
+* video
+
+### cometx reproduce
+
+```
+cometx reproduce [-h] [--run] [--executable EXECUTABLE] COMET_PATH OUTPUT_DIR
+```
 
 For all variations, use the `--help` flag to get additional information.
 
