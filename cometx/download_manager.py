@@ -215,6 +215,7 @@ class DownloadManager:
         filename=None,
         asset_type=None,
         overwrite=False,
+        skip=False,
     ):
         # type: (Optional[str], Optional[List[str]], Optional[List[str]], Optional[str], Optional[bool], Optional[bool], Optional[bool], Optional[bool], Optional[str], Optional[str], Optional[bool]) -> None
         """
@@ -223,6 +224,7 @@ class DownloadManager:
         Args:
             comet_path: (str, optional) the Comet path to the experiment, artifact, or model-registry
             include: (list of str, optional) experiment resources to include in download
+            skip: if True, skip experiments if they have been previously downloaded
             ignore: (list of str, optional) experiment resources to ignore
             output: (str, optional) output path to download to; default is current folder
             use_name: (bool, optional) if True, use the experiment name for folder name; else
@@ -263,6 +265,7 @@ class DownloadManager:
         self.root = output if output is not None else os.getcwd()
         self.use_name = use_name
         self.flat = flat
+        self.skip = skip
         self.force = force
         self.filename = filename
         self.asset_type = asset_type
@@ -950,7 +953,7 @@ class DownloadManager:
     def get_git_text(self, experiment):
         git_meta = experiment.get_git_metadata()
         git_patch = experiment.get_git_patch()
-        
+
         if git_meta["origin"]:
             origin = git_meta["origin"]
             directory = git_meta["origin"].split("/")[-1].split(".")[0]
@@ -1110,6 +1113,10 @@ class DownloadManager:
             top_level: (bool, optional) is this the top of the download
                 hierarchy?
         """
+        path = self.get_experiment_path(experiment)
+        if os.path.exists(path) and self.skip:
+            return
+
         functions = []
         for resource in self.include:
             if resource in self.RESOURCE_FUNCTIONS:

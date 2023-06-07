@@ -45,6 +45,7 @@ $ cometx download WORKSPACE/model-registry/NAME/VERSION-OR-STAGE [FLAGS ...]
 
 Where [FLAGS ...] is zero or more of the following:
 
+* `--skip` - if given, skip previously downloaded experiments
 * `--list` - use to list available workspaces, projects, experiments,
     artifacts, or models
 * `--output` - download resources to folder other than current one
@@ -57,7 +58,6 @@ Where [FLAGS ...] is zero or more of the following:
 * `--overwrite` - overwrite any existing files
 * `--force` - don't ask to download, just do it
 * `--help` - this message
-
 """
 
 import argparse
@@ -127,6 +127,13 @@ def get_parser_arguments(parser):
         default=False,
     )
     parser.add_argument(
+        "-s",
+        "--skip",
+        help="If given, skip previously downloaded experiments",
+        action="store_true",
+        default=False,
+    )
+    parser.add_argument(
         "--filename",
         help="Only get resources ending with this",
         type=str,
@@ -166,6 +173,7 @@ def download(parsed_args, remaining=None):
             filename=parsed_args.filename,
             asset_type=parsed_args.asset_type,
             overwrite=parsed_args.overwrite,
+            skip=parsed_args.skip,
         )
     except InvalidRestAPIKey:
         display_invalid_api_key()
