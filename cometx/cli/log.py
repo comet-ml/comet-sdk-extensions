@@ -200,6 +200,8 @@ def log_cli(parsed_args):
 
     elif parsed_args.type == "other":
         # two possibilities: log key:value to set of experiments; log filename to experiment
+        api = API()
+
         if parsed_args.FILENAME:
             if not experiment:
                 experiment = create_experiment(workspace, project_name)
@@ -215,7 +217,7 @@ def log_cli(parsed_args):
             experiments = [experiment]
         else:
             experiments = api.get_experiments(workspace, project_name)
-        set_experiments_other(workspace, project_name, key, value)
+        set_experiments_other(experiments, key, value)
 
     elif parsed_args.type == "metrics":
         if not parsed_args.FILENAME:
@@ -244,7 +246,8 @@ def log_cli(parsed_args):
 
         log_experiment_assets_from_file(experiment, parsed_args.FILENAME, parsed_args.type)
 
-    experiment.end()
+    if experiment:
+        experiment.end()
 
 def log_experiment_assets_from_file(experiment, filename, file_type):
     SKELETON = filename
@@ -276,10 +279,12 @@ def log_experiment_code_from_file(experiment, filename):
         raise Exception("cannot log code: %r; use filename or folder" % filename)
 
 def set_experiments_other(experiments, key, value):
-    api = API()
+    if "{random}" in value:
+        from ..generate_utils import generate_experiment_name
 
     for experiment in experiments:
-        experiment.log_other(key, value)
+        new_value = value.replace("{random}", generate_experiment_name())
+        experiment.log_other(key, new_value)
 
 def log_experiment_metrics_from_file(experiment, filename):
     for line in open(filename):
