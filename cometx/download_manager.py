@@ -22,6 +22,7 @@ import json
 import logging
 import os
 import zipfile
+import re
 
 try:
     from tqdm import tqdm as ProgressBar
@@ -216,6 +217,7 @@ class DownloadManager:
         asset_type=None,
         overwrite=False,
         skip=False,
+        debug=False,
     ):
         # type: (Optional[str], Optional[List[str]], Optional[List[str]], Optional[str], Optional[bool], Optional[bool], Optional[bool], Optional[bool], Optional[str], Optional[str], Optional[bool]) -> None
         """
@@ -263,6 +265,7 @@ class DownloadManager:
                 return
 
         self.root = output if output is not None else os.getcwd()
+        self.debug = debug
         self.use_name = use_name
         self.flat = flat
         self.skip = skip
@@ -597,11 +600,25 @@ class DownloadManager:
         return os.path.join(self.root, workspace, project_name, name, *subdirs)
 
     def _should_write(self, filepath):
-        if self.filename and not filepath.endswith(self.filename):
+        if self.filename:
+            retval = re.search(self.filename, filepath)
+            if self.debug:
+                if not retval:
+                    print("    skipping %r, does not match filename %r" % (filepath, self.filename))
+                else:
+                    print("    writing matched %r" % filepath)
+            return retval
+        elif self.overwrite:
+            print("    over-writing %r" % filepath)
+            return True
+        elif os.path.exists(filepath):
+            if self.debug:
+                print("    skipping %r, overwrite is False" % filepath)
             return False
         else:
-            return (not os.path.exists(filepath)) or self.overwrite
-
+            print("    writing %r" % filepath)
+            return True
+        
     def download_graph(self, experiment):
         # type: (APIExperiment) -> None
         """

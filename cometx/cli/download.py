@@ -148,7 +148,13 @@ def get_parser_arguments(parser):
     parser.add_argument(
         "--overwrite",
         help="Overwrite any existing files",
-        type=bool,
+        action="store_true",
+        default=False,
+    )
+    parser.add_argument(
+        "--debug",
+        help="Provide debug info",
+        action="store_true",
         default=False,
     )
 
@@ -174,11 +180,15 @@ def download(parsed_args, remaining=None):
             asset_type=parsed_args.asset_type,
             overwrite=parsed_args.overwrite,
             skip=parsed_args.skip,
+            debug=parsed_args.debug,
         )
     except InvalidRestAPIKey:
         display_invalid_api_key()
     except Exception as exc:
-        print("Download aborted: %s" % str(exc))
+        if parsed_args.debug:
+            raise exc from None
+        else:
+            print("Download aborted: %s" % str(exc))
     except KeyboardInterrupt:
         print("User canceled download by keyboard interrupt")
 
