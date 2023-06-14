@@ -609,14 +609,16 @@ class DownloadManager:
                     print("    writing matched %r" % filepath)
             return retval
         elif self.overwrite:
-            print("    over-writing %r" % filepath)
+            if self.debug:
+                print("    over-writing %r" % filepath)
             return True
         elif os.path.exists(filepath):
             if self.debug:
                 print("    skipping %r, overwrite is False" % filepath)
             return False
         else:
-            print("    writing %r" % filepath)
+            if self.debug:
+                print("    writing %r" % filepath)
             return True
         
     def download_graph(self, experiment):
