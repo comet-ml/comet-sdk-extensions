@@ -1,5 +1,12 @@
 # cometx
 
+```
+   _________  ____ ___  ___  / /__  __
+  / ___/ __ \/ __ `__ \/ _ \/ __/ |/_/
+ / /__/ /_/ / / / / / /  __/ /__>  <
+ \___/\____/_/ /_/ /_/\___/\__/_/|_|
+```
+
 Open source extensions for the [Comet](https://www.comet.com/site/?utm_source=cometx&utm_medium=referral&utm_campaign=cometx_2022&utm_content=github) SDK.
 
 These extensions are created and supported by the community and are
