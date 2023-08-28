@@ -70,6 +70,7 @@ def reproduce(parsed_args, remaining=None):
 
     manager = DownloadManager()
     manager.root = parsed_args.OUTPUT_DIR
+    manager.debug = False
     manager.use_name = False
     manager.flat = True
     manager.force = False
