@@ -63,8 +63,8 @@ The subcommands:
 * cometx list
 * cometx download
 * cometx log
-* comet reproduce
-* comet delete
+* cometx reproduce
+* cometx delete
 
 ### cometx list
 
