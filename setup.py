@@ -48,6 +48,7 @@ setup_args = dict(
     install_requires=["comet_ml"],
     packages=[
         "cometx.cli",
+        "cometx.tools",
         "cometx",
     ],
     entry_points={"console_scripts": ["cometx = cometx.cli:main"]},

@@ -7,7 +7,7 @@
 # \___/\____/_/ /_/ /_/\___/\__/_/|_|
 #
 #
-#  Copyright (c) 2022 Cometx Development
+#  Copyright (c) 2023 Cometx Development
 #      Team. All rights reserved.
 # ****************************************
 
@@ -15,6 +15,8 @@ import math
 import json
 import tempfile
 import os
+import random
+import pathlib
 
 from collections import defaultdict
 
@@ -33,6 +35,16 @@ def merge_files(temp_files, filename_out):
                 while line:
                     fp_out.write(line)
                     line = fp.readline()
+
+def shuffle_in_memory(filename_in, filename_out):
+    # Shuffle a file, line-by-line
+    with open(filename_in) as fp:
+        lines = fp.readlines()
+    # Randomize them in place:
+    random.shuffle(lines)
+    # Write the new order out:
+    with open(filename_out, "w") as fp:
+        fp.writelines(lines)
 
 def shuffle(filename_in, filename_out, memory_limit, file_split_count, 
             depth=0, debug=False):
@@ -196,7 +208,7 @@ def draw_point_fake(size, fcanvas, transform, point, color):
 
 def render(points_filename, boxes_filename, x, y, z, min_max_x, min_max_y, min_max_z):
     """
-    Given to files, points and boxes, a center x, y ,z, and ranges,
+    Given to files, points and boxes, rotations (in degrees) on x, y ,z, and ranges,
     create an image.
     """
     if Image is None:
@@ -234,11 +246,11 @@ def render(points_filename, boxes_filename, x, y, z, min_max_x, min_max_y, min_m
     fcanvas = defaultdict(lambda: None)
 
     # Randomize files:
-    shuffle(points_filename, filename_out, memory_limit, file_split_count)
-    shuffle(boxes_filename, filename_out, memory_limit, file_split_count)
+    shuffle(points_filename, points_filename + ".shuffled", memory_limit=1_000_000, file_split_count=10)
+    shuffle(boxes_filename, boxes_filename + ".shuffled", memory_limit=1_000_000, file_split_count=10)
     
     # Draw points first
-    with open(points_filename) as fp:
+    with open(points_filename + ".shuffled") as fp:
         line = fp.readline()
         while line:
             data = json.loads(line)
@@ -260,7 +272,7 @@ def render(points_filename, boxes_filename, x, y, z, min_max_x, min_max_y, min_m
             canvas.point((x,y), fill=color)
 
     # Draw boxes last to show on top of points
-    with open(boxes_filename) as fp:
+    with open(boxes_filename + ".shuffled") as fp:
         line = fp.readline()
         while line:
             data = json.loads(line)
@@ -280,15 +292,29 @@ def render(points_filename, boxes_filename, x, y, z, min_max_x, min_max_y, min_m
 
     return image
 
-def create_image(points, boxes):
+def create_image(points=None, boxes=None, x=45, y=0, z=45,
+                 output_filename="pointcloud.gif", swap_yz=True,
+                 x_incr=0, y_incr=0, z_incr=0, steps=0):
     """
     """
     min_max_x = [float("inf"), float("-inf")]
     min_max_y = [float("inf"), float("-inf")]
     min_max_z = [float("inf"), float("-inf")]
 
+    if isinstance(points, (str, pathlib.Path)):
+        points = (json.loads(line) for line in open(points))
+    elif points is None:
+        points = []
+
+    if isinstance(boxes, (str, pathlib.Path)):
+        boxes = (json.loads(line) for line in open(boxes))
+    elif boxes is None:
+        boxes = []
+
     with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False) as points_fp:
         for point in points:
+            if swap_yz:
+                point[1], point[2] = point[2], point[1]
             min_max_x = min(point[0], min_max_x[0]), max(point[0], min_max_x[1])
             min_max_y = min(point[1], min_max_y[0]), max(point[1], min_max_y[1])
             min_max_z = min(point[2], min_max_z[0]), max(point[2], min_max_z[1])
@@ -299,21 +325,69 @@ def create_image(points, boxes):
         for box in boxes:
             for points in box["segments"]:
                 for point in points:
+                    if swap_yz:
+                        point[1], point[2] = point[2], point[1]
                     min_max_x = min(point[0], min_max_x[0]), max(point[0], min_max_x[1])
                     min_max_y = min(point[1], min_max_y[0]), max(point[1], min_max_y[1])
                     min_max_z = min(point[2], min_max_z[0]), max(point[2], min_max_z[1])
             boxes_fp.write(json.dumps(box))
             boxes_fp.write("\n")
 
-    image =  create_thumbnail(
-        points_fp.name,
-        boxes_fp.name,
-        45,
-        0,
-        45,
-        min_max_x,
-        min_max_y,
-        min_max_z,
-    )
+    if steps == 0:
+        image =  render(
+            points_fp.name,
+            boxes_fp.name,
+            x,
+            y,
+            z,
+            min_max_x,
+            min_max_y,
+            min_max_z,
+        )
+        print(f"Saving to '{output_filename}'...")
+        image.save(output_filename)
+        return image
+    else:
+        images = []
+        for step in range(steps):
+            image =  render(
+                points_fp.name,
+                boxes_fp.name,
+                x,
+                y,
+                z,
+                min_max_x,
+                min_max_y,
+                min_max_z,
+            )
+            images.append(image)
+            x += x_incr
+            y += y_incr
+            z += z_incr
 
-    return image
+        for step in range(steps):
+            image =  render(
+                points_fp.name,
+                boxes_fp.name,
+                x,
+                y,
+                z,
+                min_max_x,
+                min_max_y,
+                min_max_z,
+            )
+            images.append(image)
+            x -= x_incr
+            y -= y_incr
+            z -= z_incr
+
+        print(f"Saving animation to '{output_filename}'...")
+        images[0].save(
+            output_filename,
+            save_all=True,
+            append_images=images[1:],
+            optimize=True,
+            duration=80,
+            loop=0
+        )
+        return images

@@ -7,7 +7,7 @@
 # \___/\____/_/ /_/ /_/\___/\__/_/|_|
 #
 #
-#  Copyright (c) 2022 Cometx Development
+#  Copyright (c) 2023 Cometx Development
 #      Team. All rights reserved.
 # ****************************************
 
