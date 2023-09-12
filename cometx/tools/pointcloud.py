@@ -206,7 +206,7 @@ def draw_point_fake(size, fcanvas, transform, point, color):
     if location is None or location["z"] < p[2]:
         fcanvas[(p[0], p[1])] = {"z": p[2], "color": color}
 
-def render(points_filename, boxes_filename, x, y, z, min_max_x, min_max_y, min_max_z):
+def render(points_filename, boxes_filename, x, y, z, min_max_x, min_max_y, min_max_z, size):
     """
     Given to files, points and boxes, rotations (in degrees) on x, y ,z, and ranges,
     create an image.
@@ -214,7 +214,6 @@ def render(points_filename, boxes_filename, x, y, z, min_max_x, min_max_y, min_m
     if Image is None:
         raise Exception("Python Image Library is not installed; pip install PIL")
     
-    size = (250, 250)
     background_color = (51, 51, 77) # Skybox color
 
     image = Image.new("RGB", size, background_color)
@@ -294,7 +293,8 @@ def render(points_filename, boxes_filename, x, y, z, min_max_x, min_max_y, min_m
 
 def create_image(points=None, boxes=None, x=45, y=0, z=45,
                  output_filename="pointcloud.gif", swap_yz=True,
-                 x_incr=0, y_incr=0, z_incr=0, steps=0):
+                 x_incr=0, y_incr=0, z_incr=0, steps=0,
+                 size=(250, 250)):
     """
     """
     min_max_x = [float("inf"), float("-inf")]
@@ -343,6 +343,7 @@ def create_image(points=None, boxes=None, x=45, y=0, z=45,
             min_max_x,
             min_max_y,
             min_max_z,
+            size,
         )
         print(f"Saving to '{output_filename}'...")
         image.save(output_filename)
@@ -359,6 +360,7 @@ def create_image(points=None, boxes=None, x=45, y=0, z=45,
                 min_max_x,
                 min_max_y,
                 min_max_z,
+                size,
             )
             images.append(image)
             x += x_incr
@@ -375,6 +377,7 @@ def create_image(points=None, boxes=None, x=45, y=0, z=45,
                 min_max_x,
                 min_max_y,
                 min_max_z,
+                size,
             )
             images.append(image)
             x -= x_incr
