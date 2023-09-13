@@ -111,11 +111,11 @@ class API(API):
             fp.write(results)
         return filename
 
-    def upload_panel_zip(self, workspace, filename):
+    def upload_panel_zip(self, workspace_id, filename):
         """
         Upload a panel zip file to a workspace.
         """
         results = self._client.post_from_endpoint(
-            "write/template/upload", {"teamId": workspace},
+            "write/template/upload", {"teamId": workspace_id},
             files={"file": filename}
         )
