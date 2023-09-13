@@ -13,3 +13,4 @@
 
 from ._version import __version__  # noqa
 from .download_manager import DownloadManager  # noqa
+from .api import API  # noqa
