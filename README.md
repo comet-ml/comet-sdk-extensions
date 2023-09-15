@@ -100,8 +100,8 @@ cometx --symlink SOURCE DESTINATION
 
 where SOURCE is:
 
-* if not --symlink, "WORKSPACE/PROJECT/EXPERIMENT", "WORKSPACE/PROJECT/*", or "WORKSPACE/*/*" folder (use quotes)
-* if --symlink, then it is a Comet path to workspace or workspace/project
+* if not `--symlink`, "WORKSPACE/PROJECT/EXPERIMENT", "WORKSPACE/PROJECT/*", or "WORKSPACE/*/*" folder (use quotes)
+* if `--symlink`, then it is a Comet path to workspace or workspace/project
 
 where DESTINATION is:
 
@@ -111,12 +111,11 @@ where DESTINATION is:
 Not all combinations are possible:
 
 
-| Destination:       | WORKSPACE            | WORKSPACE/PROJECT      |
-| Source (below)     |                      |                        |
+| Destination:<br/>Source (below)| WORKSPACE            | WORKSPACE/PROJECT      |
 |--------------------|----------------------|------------------------|
-| WORKSPACE/*/*      | Copies all projects  | N/A                    |
-| WORKSPACE/PROJ/*   | N/A                  | Copies all experiments |
-| WORKSPACE/PROJ/EXP | N/A                  | Copies experiment      |
+| `WORKSPACE/*/*`      | Copies all projects  | N/A                    |
+| `WORKSPACE/PROJ/*`   | N/A                  | Copies all experiments |
+| `WORKSPACE/PROJ/EXP` | N/A                  | Copies experiment      |
 
 
 ### cometx download
