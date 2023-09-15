@@ -12,10 +12,21 @@
 #      Team. All rights reserved.
 # ****************************************
 """
-To upload experiment data to new experiments.
+To copy experiment data to new experiments.
 
-cometx upload WORKSPACE SOURCE-FOLDER
-cometx upload WORKSPACE/PROJECT SOURCE-FOLDER
+cometx copy [--symlink] SOURCE DESTINATION
+
+where SOURCE is:
+
+* if not --symlink, "WORKSPACE/PROJECT/EXPERIMENT", "WORKSPACE/PROJECT/*", or "WORKSPACE/*/*" folder (use quotes)
+* if --symlink, then it is a Comet path to workspace or workspace/project
+
+where DESTINATION is:
+
+* WORKSPACE
+* WORKSPACE/PROJECT
+
+Not all combinations are possible:
 
 
 | Destination:       | WORKSPACE            | WORKSPACE/PROJECT      |
@@ -32,7 +43,7 @@ import json
 import os
 import sys
 
-from comet_ml import Experiment, API
+from comet_ml import Experiment, API, APIExperiment
 from comet_ml.messages import StandardOutputMessage, InstalledPackagesMessage, HtmlMessage
 
 from cometx.utils import get_file_extension
@@ -40,41 +51,19 @@ from cometx.utils import get_file_extension
 
 ADDITIONAL_ARGS = False
 
-# From filename extension to Comet Asset Type
-EXTENSION_MAP = {
-    "asset": "asset",
-    "datagrid": "datagrid",
-    "png": "image",
-    "jpg": "image",
-    "gif": "image",
-    "txt": "text-sample",
-    "webm": "video",
-    "mp4": "video",
-    "ogg": "video",
-    "ipynb": "notebook",
-    "wav": "audio",
-    "mp3": "audio",
-    #    "curve": "curve", FIXME: add
-}
-# Fom CLI type to Comet Asset Type
-# List only those that differ from
-# type.lower() != Comet Asset Type
-TYPE_MAP = {
-    "text": "text-sample",
-}
 
 def get_parser_arguments(parser):
     parser.add_argument(
-        "COMET_DESTINATION",
+        "COMET_SOURCE",
         help=(
-            "The Comet destination: 'WORKSPACE', 'WORKSPACE/PROJECT'"
+            "The folder containing the experiments to copy: 'workspace/*/*', or 'workspace/project/*' or 'workspace/project/experiment'"
         ),
         type=str,
     )
     parser.add_argument(
-        "COMET_SOURCE",
+        "COMET_DESTINATION",
         help=(
-            "The folder containing the experiments to upload: 'workspace/*/*', or 'workspace/project/*' or 'workspace/project/experiment'"
+            "The Comet destination: 'WORKSPACE', 'WORKSPACE/PROJECT'"
         ),
         type=str,
     )
@@ -84,12 +73,18 @@ def get_parser_arguments(parser):
         default=False,
         action="store_true"
     )
+    parser.add_argument(
+        "--symlink",
+        help="Instead of copying, create a link to an experiment in a project",
+        default=False,
+        action="store_true"
+    )
 
 
-def upload(parsed_args, remaining=None):
-    # Called via `cometx upload ...`
+def copy(parsed_args, remaining=None):
+    # Called via `cometx copy ...`
     try:
-        upload_cli(parsed_args)
+        copy_cli(parsed_args)
     except KeyboardInterrupt:
         print("Canceled by CONTROL+C")
     except Exception as exc:
@@ -141,13 +136,15 @@ def get_experiment_folders(workspace_src, project_src, experiment_src):
 
 def copy_experiment_to(experiment_folder, workspace_dst, project_dst):
     # if project doesn't exist, create it
+    print(f"Copying from {experiment_folder} to {workspace_dst}/{project_dst}...")
     experiment = create_experiment(workspace_dst, project_dst)
     # copy experiment_folder stuff to experiment
     # copy all resources to existing or new experiment
     log_all(experiment, experiment_folder)
     experiment.end()
+    print(f"    New experiment created: {experiment.url}")
 
-def upload_cli(parsed_args):
+def copy_cli(parsed_args):
     """
     | Destination:       | WORKSPACE            | WORKSPACE/PROJECT      |
     | Source (below)     |                      |                        |
@@ -180,50 +177,86 @@ def upload_cli(parsed_args):
         raise Exception("invalid COMET_SOURCE: %r" % parsed_args.COMET_SOURCE)
 
     for experiment_folder in get_experiment_folders(workspace_src, project_src, experiment_src):
-        copy_experiment_to(experiment_folder, workspace_dst, project_dst)
+        if parsed_args.symlink:
+            print(f"Creating symlink from {workspace_src}/{project_src}/{experiment_src} to {workspace_dst}/{project_dst}")
+            experiment = APIExperiment(previous_experiment=experiment_src)
+            experiment.create_symlink(project_dst)
+            print(f"    New symlink created: {api._get_url_server()}/{workspace_dst}/{project_dst}/{experiment_src}")
+        else:
+            copy_experiment_to(experiment_folder, workspace_dst, project_dst)
 
     return
 
 
-def get_filenames(path):
-    for filename in glob.glob(path):
-        if os.path.isfile(filename):
-            yield filename
-        else:
-            for entry in os.scandir(filename):
-                if entry.is_dir(follow_symlinks=False):
-                    yield from get_filenames(entry.path)
-                else:
-                    yield entry.path
-            
-def log_experiment_assets_from_file(experiment, filename, file_type):
-    SKELETON = filename
-    for filename in get_filenames(SKELETON):
-        if not file_type:
-            extension = get_file_extension(filename)
-            file_type = EXTENSION_MAP.get(extension.lower(), "asset")
+def log_metadata(experiment, filename):
+    # FIXME
+    # tags
+    # filename
+    if os.path.exists(filename):
+        metadata = json.load(open(filename))
+        experiment.add_tags(metadata["tags"])
+        # FIXME: missing:
+        ##  throttle data
+        ##  durationMillis
+        ##  startTimeMillis
+        ##  endTimeMillis
 
-        if file_type == "notebook":
-            # metadata = FIXME: get metadata dict from args
-            experiment.log_notebook(filename)
-            #elif file_type == "histogram":
-            # decompose, re-log it
-            #elif file_type == "confusion-matrix":
+def log_graph(experiment, filename):
+    if os.path.exists(filename):
+        experiment.set_model_graph(open(filename).read())
+        
+def log_assets(experiment, path, assets_metadata):
+    """
+    {"fileName": "text-sample-3.txt", 
+     "fileSize": 37, 
+     "runContext": null, 
+     "step": 3, 
+     "remote": false, 
+     "link": "", 
+     "compressedAssetLink": "", 
+     "s3Link": "", 
+     "createdAt": 1694757164606, 
+     "dir": "text-samples", 
+     "canView": false, 
+     "audio": false, 
+     "video": false, 
+     "histogram": false, 
+     "image": false, 
+     "type": "text-sample", 
+     "metadata": null, 
+     "assetId": "0f8faff37fda4d40b7e0f5c665c3611a", 
+     "tags": [], 
+     "curlDownload": "", 
+     "experimentKey": "92ecd97e311c41939c7f68ddec98ba67"
+    }
+    """
+    for log_filename in assets_metadata:
+        asset_type = assets_metadata[log_filename].get("type", None)
+        asset_type = asset_type if asset_type else "asset"
+        filename = os.path.join(path, asset_type, log_filename)
+
+        metadata = assets_metadata[log_filename].get("metadata")
+        metadata = json.loads(metadata) if metadata else {}
+
+        if asset_type == "notebook":
+            experiment.log_notebook(filename)  # done!
+            #elif asset_type == "confusion-matrix":
             # TODO: what to do about assets referenced in matrix?
-            #elif file_type == "embedding":
+            #elif asset_type == "embedding":
             # TODO: what to do about assets referenced in embedding?
         else:
-            # metadata = FIXME: get metadata dict from args
             binary_io = open(filename, "rb")
 
             experiment._log_asset(
                 binary_io,
-                file_name=filename.split("/", 5)[-1],
+                file_name=log_filename,
                 copy_to_tmp=True,
-                asset_type=file_type,
-            )
+                asset_type=asset_type,
+                metadata=metadata,
+                step=assets_metadata[log_filename].get("step", None),
+            )  # done!
 
-def log_experiment_code_from_file(experiment, filename):
+def log_code(experiment, filename):
     """
     """
     if os.path.exists(filename):
@@ -232,12 +265,12 @@ def log_experiment_code_from_file(experiment, filename):
         elif os.path.isdir(filename):
             experiment.log_code(folder=str(filename))
 
-def log_experiment_requirements_from_file(experiment, filename):
+def log_requirements(experiment, filename):
     """
     Requirements (pip packages)
     """
     if os.path.exists(filename):
-        installed_packages_list = [package for package in open(filename)]
+        installed_packages_list = [package.strip() for package in open(filename)]
         if installed_packages_list is None:
             return
         message = InstalledPackagesMessage.create(
@@ -247,7 +280,7 @@ def log_experiment_requirements_from_file(experiment, filename):
         )
         experiment._enqueue_message(message)
 
-def log_experiment_metrics_from_file(experiment, filename):
+def log_metrics(experiment, filename):
     """
     """
     if os.path.exists(filename):
@@ -260,7 +293,7 @@ def log_experiment_metrics_from_file(experiment, filename):
             # FIXME: does not log time, duration
             experiment.log_metric(name, value, step=step, epoch=epoch)
 
-def log_experiment_parameters_from_file(experiment, filename):
+def log_parameters(experiment, filename):
     """
     """
     if os.path.exists(filename):
@@ -270,7 +303,7 @@ def log_experiment_parameters_from_file(experiment, filename):
             value = parameter["valueCurrent"]
             experiment.log_parameter(name, value)
 
-def log_experiment_others_from_file(experiment, filename):
+def log_others(experiment, filename):
     """
     """
     if os.path.exists(filename):
@@ -280,7 +313,7 @@ def log_experiment_others_from_file(experiment, filename):
             value = dict_line["valueCurrent"]
             experiment.log_other(key=name, value=value)
 
-def log_experiment_output(experiment, output_file):
+def log_output(experiment, output_file):
     """
     """
     if os.path.exists(output_file):
@@ -293,12 +326,12 @@ def log_experiment_output(experiment, output_file):
             )
             experiment._enqueue_message(message)
 
-def log_experiment_html(experiment, filename):
+def log_html(experiment, filename):
     if os.path.exists(filename):
         html = open(filename).read()
         message = HtmlMessage.create(
-            context=self.context,
-            use_http_messages=self.streamer.use_http_messages,
+            context=experiment.context,
+            use_http_messages=experiment.streamer.use_http_messages,
             html=html,
         )
         experiment._enqueue_message(message)
@@ -306,49 +339,57 @@ def log_experiment_html(experiment, filename):
 def log_all(experiment, experiment_folder):
     """
     """
-    log_experiment_metrics_from_file(
+    # FIXME: missing notes (edited by human, not logged programmatically)
+    log_metrics(
         experiment,
         os.path.join(experiment_folder, "metrics.jsonl")
     )
 
-    log_experiment_parameters_from_file(
+    log_parameters(
         experiment,
         os.path.join(experiment_folder, "parameters.json")
     )
 
-    log_experiment_others_from_file(
+    log_others(
         experiment,
         os.path.join(experiment_folder, "others.jsonl")
     )
 
-    for dirname in glob.glob(os.path.join(experiment_folder, "assets", "*")):
-        if os.path.isdir(dirname):
-            base, asset_type = dirname.rsplit("/", 1)
-            log_experiment_assets_from_file(
-                experiment,
-                os.path.join(experiment_folder, "assets", asset_type, "*"),
-                asset_type
-            )
+    assets_metadata_filename = os.path.join(experiment_folder, "assets", "assets_metadata.jsonl")
+    assets_metadata = {}
+    if os.path.exists(assets_metadata_filename):
+        for line in open(assets_metadata_filename):
+            data = json.loads(line)
+            assets_metadata[data["fileName"]] = data
 
-    log_experiment_output(
+        log_assets(
+            experiment,
+            os.path.join(experiment_folder, "assets"),
+            assets_metadata
+        )
+
+    log_output(
         experiment,
         os.path.join(experiment_folder, "run/output.txt")
     )
 
-    log_experiment_requirements_from_file(
+    log_requirements(
         experiment, 
         os.path.join(experiment_folder, "run/requirements.txt")
     )
 
+    log_graph(
+        experiment,
+        os.path.join(experiment_folder, "run/graph_definition.txt")
+    )
 
+    log_html(
+        experiment,
+        os.path.join(experiment_folder, "experiment.html"),
+    )
     
     # FIXME:
     ## models
-    ## notes
-    ## metadata
-    ## confusion-matrix assets
-    ## histogram (deconstruct) and assets
-    ## html
 
 def main(args):
     parser = argparse.ArgumentParser(
@@ -356,9 +397,9 @@ def main(args):
     )
     get_parser_arguments(parser)
     parsed_args = parser.parse_args(args)
-    upload(parsed_args)
+    copy(parsed_args)
 
 
 if __name__ == "__main__":
-    # Called via `python -m cometx.cli.upload ...`
+    # Called via `python -m cometx.cli.copy ...`
     main(sys.argv[1:])

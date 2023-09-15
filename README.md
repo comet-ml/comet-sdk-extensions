@@ -62,6 +62,7 @@ The subcommands:
 
 * cometx list
 * cometx download
+* cometx copy
 * cometx log
 * cometx reproduce
 * cometx delete
@@ -82,6 +83,41 @@ cometx list WORKSPACE/PROJECT
 cometx list WORKSPACE
 cometx list
 ```
+
+### cometx copy
+
+This command is used to:
+
+* copy downloaded data to a new experiment
+* create a symlink from one project to existing experiments
+
+cometx copy examples:
+
+```
+cometx SOURCE DESTINATION
+cometx --symlink SOURCE DESTINATION
+```
+
+where SOURCE is:
+
+* if not --symlink, "WORKSPACE/PROJECT/EXPERIMENT", "WORKSPACE/PROJECT/*", or "WORKSPACE/*/*" folder (use quotes)
+* if --symlink, then it is a Comet path to workspace or workspace/project
+
+where DESTINATION is:
+
+* WORKSPACE
+* WORKSPACE/PROJECT
+
+Not all combinations are possible:
+
+
+| Destination:       | WORKSPACE            | WORKSPACE/PROJECT      |
+| Source (below)     |                      |                        |
+|--------------------|----------------------|------------------------|
+| WORKSPACE/*/*      | Copies all projects  | N/A                    |
+| WORKSPACE/PROJ/*   | N/A                  | Copies all experiments |
+| WORKSPACE/PROJ/EXP | N/A                  | Copies experiment      |
+
 
 ### cometx download
 
