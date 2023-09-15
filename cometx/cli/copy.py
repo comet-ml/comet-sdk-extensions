@@ -190,7 +190,6 @@ def copy_cli(parsed_args):
 
 def log_metadata(experiment, filename):
     # FIXME
-    # tags
     # filename
     if os.path.exists(filename):
         metadata = json.load(open(filename))
@@ -343,6 +342,11 @@ def log_all(experiment, experiment_folder):
     log_metrics(
         experiment,
         os.path.join(experiment_folder, "metrics.jsonl")
+    )
+
+    log_metadata(
+        experiment,
+        os.path.join(experiment_folder, "metadata.json")
     )
 
     log_parameters(
