@@ -15,7 +15,6 @@ import math
 import json
 import tempfile
 import os
-import random
 import pathlib
 
 from collections import defaultdict
@@ -24,57 +23,6 @@ try:
     from PIL import Image, ImageDraw
 except ImportError:
     Image, ImageDraw = None, None
-
-## Randomize large files
-
-def merge_files(temp_files, filename_out):
-    with open(filename_out, "w") as fp_out:
-        for temp_file in temp_files:
-            with open(temp_file.name) as fp:
-                line = fp.readline()
-                while line:
-                    fp_out.write(line)
-                    line = fp.readline()
-
-def shuffle_in_memory(filename_in, filename_out):
-    # Shuffle a file, line-by-line
-    with open(filename_in) as fp:
-        lines = fp.readlines()
-    # Randomize them in place:
-    random.shuffle(lines)
-    # Write the new order out:
-    with open(filename_out, "w") as fp:
-        fp.writelines(lines)
-
-def shuffle(filename_in, filename_out, memory_limit, file_split_count, 
-            depth=0, debug=False):
-    if os.path.getsize(filename_in) < memory_limit:
-        if debug: print(" " * depth, f"Level {depth + 1}",
-            "Shuffle in memory...")
-        shuffle_in_memory(filename_in, filename_out)
-    else:
-        if debug: print(
-            " " * depth, f"Level {depth + 1}",
-            f"{os.path.getsize(filename_in)} is too big;",
-            f"Split into {file_split_count} files..."
-        )
-        # Split the big file into smaller files
-        temp_files = [tempfile.NamedTemporaryFile('w+', delete=False)
-                      for i in range(file_split_count)]
-        for line in open(filename_in):
-            random_index = random.randint(0, len(temp_files) - 1)
-            temp_files[random_index].write(line)
-
-        # Now we shuffle each smaller file
-        for temp_file in temp_files:
-            temp_file.close()
-            shuffle(temp_file.name, temp_file.name, memory_limit, 
-                    file_split_count, depth+1, debug)
-
-        # And merge back in place of the original
-        if debug: print(" " * depth, f"Level {depth + 1}", 
-            "Merge files...")
-        merge_files(temp_files, filename_out)
 
 ## 3D Graphics functions
 
@@ -244,12 +192,8 @@ def render(points_filename, boxes_filename, x, y, z, min_max_x, min_max_y, min_m
     # Fake canvas:
     fcanvas = defaultdict(lambda: None)
 
-    # Randomize files:
-    shuffle(points_filename, points_filename + ".shuffled", memory_limit=1_000_000, file_split_count=10)
-    shuffle(boxes_filename, boxes_filename + ".shuffled", memory_limit=1_000_000, file_split_count=10)
-    
     # Draw points first
-    with open(points_filename + ".shuffled") as fp:
+    with open(points_filename) as fp:
         line = fp.readline()
         while line:
             data = json.loads(line)
@@ -271,7 +215,7 @@ def render(points_filename, boxes_filename, x, y, z, min_max_x, min_max_y, min_m
             canvas.point((x,y), fill=color)
 
     # Draw boxes last to show on top of points
-    with open(boxes_filename + ".shuffled") as fp:
+    with open(boxes_filename) as fp:
         line = fp.readline()
         while line:
             data = json.loads(line)
