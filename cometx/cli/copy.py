@@ -44,7 +44,8 @@ import os
 import sys
 
 from comet_ml import Experiment, API, APIExperiment
-from comet_ml.messages import StandardOutputMessage, InstalledPackagesMessage, HtmlMessage
+from comet_ml.messages import StandardOutputMessage, InstalledPackagesMessage, HtmlMessage, MetricMessage
+
 
 from cometx.utils import get_file_extension
 
@@ -232,7 +233,10 @@ def log_assets(experiment, path, assets_metadata):
     for log_filename in assets_metadata:
         asset_type = assets_metadata[log_filename].get("type", None)
         asset_type = asset_type if asset_type else "asset"
-        filename = os.path.join(path, asset_type, log_filename)
+        if log_filename.startswith("/"):
+            filename = os.path.join(path, asset_type, log_filename[1:])
+        else:
+            filename = os.path.join(path, asset_type, log_filename)
 
         metadata = assets_metadata[log_filename].get("metadata")
         metadata = json.loads(metadata) if metadata else {}
@@ -289,8 +293,16 @@ def log_metrics(experiment, filename):
             value = dict_line["metricValue"]
             step = dict_line["step"]
             epoch = dict_line["epoch"]
+            context = dict_line["runContext"]
+            timestamp = dict_line["timestamp"]
             # FIXME: does not log time, duration
-            experiment.log_metric(name, value, step=step, epoch=epoch)
+            message = MetricMessage.create(
+                context=context,
+                use_http_messages=experiment.streamer.use_http_messages,
+                timestamp=timestamp,
+            )
+            message.set_metric(name, value, step=step, epoch=epoch)
+            experiment._enqueue_message(message)
 
 def log_parameters(experiment, filename):
     """
