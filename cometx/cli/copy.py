@@ -18,7 +18,7 @@ cometx copy [--symlink] SOURCE DESTINATION
 
 where SOURCE is:
 
-* if not --symlink, "WORKSPACE/PROJECT/EXPERIMENT", "WORKSPACE/PROJECT/*", or "WORKSPACE/*/*" folder (use quotes)
+* if not --symlink, "WORKSPACE/PROJECT/EXPERIMENT", "WORKSPACE/PROJECT", or "WORKSPACE" folder
 * if --symlink, then it is a Comet path to workspace or workspace/project
 
 where DESTINATION is:
@@ -32,8 +32,8 @@ Not all combinations are possible:
 | Destination:       | WORKSPACE            | WORKSPACE/PROJECT      |
 | Source (below)     |                      |                        |
 |--------------------|----------------------|------------------------|
-| WORKSPACE/*/*      | Copies all projects  | N/A                    |
-| WORKSPACE/PROJ/*   | N/A                  | Copies all experiments |
+| WORKSPACE          | Copies all projects  | N/A                    |
+| WORKSPACE/PROJ     | N/A                  | Copies all experiments |
 | WORKSPACE/PROJ/EXP | N/A                  | Copies experiment      |
 """
 
@@ -57,7 +57,7 @@ def get_parser_arguments(parser):
     parser.add_argument(
         "COMET_SOURCE",
         help=(
-            "The folder containing the experiments to copy: 'workspace/*/*', or 'workspace/project/*' or 'workspace/project/experiment'"
+            "The folder containing the experiments to copy: 'workspace', or 'workspace/project' or 'workspace/project/experiment'"
         ),
         type=str,
     )
@@ -145,39 +145,61 @@ def copy_experiment_to(experiment_folder, workspace_dst, project_dst):
     experiment.end()
     print(f"    New experiment created: {experiment.url}")
 
+def remove_extra_slashes(path):
+    if path:
+        if path.startswith("/"):
+            path = path[1:]
+        if path.endswith("/"):
+            path = path[:-1]
+        return path
+    else:
+        return ""
+
+
 def copy_cli(parsed_args):
     """
     | Destination:       | WORKSPACE            | WORKSPACE/PROJECT      |
     | Source (below)     |                      |                        |
     |--------------------|----------------------|------------------------|
-    | WORKSPACE/*/*      | Copies all projects  | N/A                    |
-    | WORKSPACE/PROJ/*   | N/A                  | Copies all experiments |
+    | WORKSPACE          | Copies all projects  | N/A                    |
+    | WORKSPACE/PROJ     | N/A                  | Copies all experiments |
     | WORKSPACE/PROJ/EXP | N/A                  | Copies experiment      |
     """
     api = API()
 
-    comet_destination = (
-        parsed_args.COMET_DESTINATION.split("/") if parsed_args.COMET_DESTINATION is not None else []
-    )
-
-    if len(comet_destination) == 1:
+    comet_destination = remove_extra_slashes(parsed_args.COMET_DESTINATION)
+    comet_destination = comet_destination.split("/")
+    if len(comet_destination) == 2:
+        workspace_dst, project_dst = comet_destination
+    elif len(comet_destination) == 1:
         workspace_dst = comet_destination[0]
         project_dst = None
-    elif len(comet_destination) == 2:
-        workspace_dst, project_dst = comet_destination
     else:
         raise Exception("invalid COMET_DESTINATION: %r" % parsed_args.COMET_DESTINATION)
 
-    comet_source = (
-        parsed_args.COMET_SOURCE.split("/") if parsed_args.COMET_SOURCE is not None else []
-    )
+    comet_source = remove_extra_slashes(parsed_args.COMET_SOURCE)
+    comet_source = comet_source.split("/")
 
     if len(comet_source) == 3:
         workspace_src, project_src, experiment_src = comet_source
+    elif len(comet_source) == 2:
+        workspace_src, project_src = comet_source
+        experiment_src = "*"
+    elif len(comet_source) == 1:
+        workspace_src = comet_source[0]
+        project_src, experiment_src = "*", "*"
     else:
         raise Exception("invalid COMET_SOURCE: %r" % parsed_args.COMET_SOURCE)
 
+    # First check to make sure workspace_dst exists:
+    workspaces = api.get_workspaces()
+    if workspace_dst not in workspaces:
+        raise Exception(f"{workspace_dst} does not exist; use the Comet UI to create it")
+
     for experiment_folder in get_experiment_folders(workspace_src, project_src, experiment_src):
+        _, folder_workspace, folder_project, folder_experiment = ("/" + experiment_folder).rsplit("/", 3)
+        if project_dst is None:
+            project_dst = folder_project
         if parsed_args.symlink:
             print(f"Creating symlink from {workspace_src}/{project_src}/{experiment_src} to {workspace_dst}/{project_dst}")
             experiment = APIExperiment(previous_experiment=experiment_src)
@@ -204,29 +226,29 @@ def log_metadata(experiment, filename):
 def log_graph(experiment, filename):
     if os.path.exists(filename):
         experiment.set_model_graph(open(filename).read())
-        
+
 def log_assets(experiment, path, assets_metadata):
     """
-    {"fileName": "text-sample-3.txt", 
-     "fileSize": 37, 
-     "runContext": null, 
-     "step": 3, 
-     "remote": false, 
-     "link": "", 
-     "compressedAssetLink": "", 
-     "s3Link": "", 
-     "createdAt": 1694757164606, 
-     "dir": "text-samples", 
-     "canView": false, 
-     "audio": false, 
-     "video": false, 
-     "histogram": false, 
-     "image": false, 
-     "type": "text-sample", 
-     "metadata": null, 
-     "assetId": "0f8faff37fda4d40b7e0f5c665c3611a", 
-     "tags": [], 
-     "curlDownload": "", 
+    {"fileName": "text-sample-3.txt",
+     "fileSize": 37,
+     "runContext": null,
+     "step": 3,
+     "remote": false,
+     "link": "",
+     "compressedAssetLink": "",
+     "s3Link": "",
+     "createdAt": 1694757164606,
+     "dir": "text-samples",
+     "canView": false,
+     "audio": false,
+     "video": false,
+     "histogram": false,
+     "image": false,
+     "type": "text-sample",
+     "metadata": null,
+     "assetId": "0f8faff37fda4d40b7e0f5c665c3611a",
+     "tags": [],
+     "curlDownload": "",
      "experimentKey": "92ecd97e311c41939c7f68ddec98ba67"
     }
     """
@@ -390,7 +412,7 @@ def log_all(experiment, experiment_folder):
     )
 
     log_requirements(
-        experiment, 
+        experiment,
         os.path.join(experiment_folder, "run/requirements.txt")
     )
 
@@ -403,7 +425,7 @@ def log_all(experiment, experiment_folder):
         experiment,
         os.path.join(experiment_folder, "experiment.html"),
     )
-    
+
     # FIXME:
     ## models
 
