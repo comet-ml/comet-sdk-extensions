@@ -198,15 +198,16 @@ def copy_cli(parsed_args):
 
     for experiment_folder in get_experiment_folders(workspace_src, project_src, experiment_src):
         _, folder_workspace, folder_project, folder_experiment = ("/" + experiment_folder).rsplit("/", 3)
-        if project_dst is None:
-            project_dst = folder_project
+        temp_project_dst = project_dst
+        if temp_project_dst is None:
+            temp_project_dst = folder_project
         if parsed_args.symlink:
-            print(f"Creating symlink from {workspace_src}/{project_src}/{experiment_src} to {workspace_dst}/{project_dst}")
+            print(f"Creating symlink from {workspace_src}/{project_src}/{experiment_src} to {workspace_dst}/{temp_project_dst}")
             experiment = APIExperiment(previous_experiment=experiment_src)
-            experiment.create_symlink(project_dst)
-            print(f"    New symlink created: {api._get_url_server()}/{workspace_dst}/{project_dst}/{experiment_src}")
+            experiment.create_symlink(temp_project_dst)
+            print(f"    New symlink created: {api._get_url_server()}/{workspace_dst}/{temp_project_dst}/{experiment_src}")
         else:
-            copy_experiment_to(experiment_folder, workspace_dst, project_dst)
+            copy_experiment_to(experiment_folder, workspace_dst, temp_project_dst)
 
     return
 
