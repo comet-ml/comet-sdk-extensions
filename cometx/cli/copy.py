@@ -136,8 +136,20 @@ def get_experiment_folders(workspace_src, project_src, experiment_src):
     yield from glob.iglob(f"{workspace_src}/{project_src}/{experiment_src}")
 
 def copy_experiment_to(experiment_folder, workspace_dst, project_dst):
+    title = experiment_folder
+    # See if there is a name:
+    filename = os.path.join(experiment_folder, "others.jsonl")
+    if os.path.isfile(filename):
+        with open(filename) as fp:
+            line = fp.readline()
+            while line:
+                others_json = json.loads(line)
+                if others_json["name"] == "Name":
+                    title = f"{experiment_folder} (\"{others_json['valueCurrent']}\")"
+                    break
+                line = fp.readline()
+    print(f"Copying from {title} to {workspace_dst}/{project_dst}...")
     # if project doesn't exist, create it
-    print(f"Copying from {experiment_folder} to {workspace_dst}/{project_dst}...")
     experiment = create_experiment(workspace_dst, project_dst)
     # copy experiment_folder stuff to experiment
     # copy all resources to existing or new experiment
@@ -261,6 +273,10 @@ def log_assets(experiment, path, assets_metadata):
         else:
             filename = os.path.join(path, asset_type, log_filename)
 
+        if not os.path.isfile(filename):
+            print("Missing file %r: unable to copy" % filename)
+            continue
+            
         metadata = assets_metadata[log_filename].get("metadata")
         metadata = json.loads(metadata) if metadata else {}
 
