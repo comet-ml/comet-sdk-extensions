@@ -912,7 +912,12 @@ class DownloadManager:
         filepath = os.path.join(path, "git_metadata.json")
         # First, save the git metadata:
         if self._should_write(filepath):
-            git_meta = experiment.get_git_metadata()
+            try:
+                git_meta = experiment.get_git_metadata()
+            except Exception:
+                print("Not allowed to get git metadata for experiment")
+                git_meta = {}
+
             git_meta_loaded = True
             if git_meta and any(git_meta.values()):
                 self.summary["git"] += 1
@@ -923,7 +928,12 @@ class DownloadManager:
         filepath = os.path.join(path, "git_diff.patch")
         # Next, save the git patch
         if self._should_write(filepath):
-            git_patch = experiment.get_git_patch()
+            try:
+                git_patch = experiment.get_git_patch()
+            except Exception:
+                print("Not allowed to get git patch for experiment")
+                git_patch = None
+                
             git_patch_loaded = True
             if git_patch:
                 try:
@@ -943,12 +953,20 @@ class DownloadManager:
         if self._should_write(filepath):
             # Make a README to restore git:
             if not git_meta_loaded:
-                git_meta = experiment.get_git_metadata()
+                try:
+                    git_meta = experiment.get_git_metadata()
+                except Exception:
+                    print("Not allowed to get git metadata for experiment")
+                    git_meta = {}
 
             if not git_patch_loaded:
-                git_patch = experiment.get_git_patch()
+                try:
+                    git_patch = experiment.get_git_patch()
+                except Exception:
+                    print("Not allowed to get git patch for experiment")
+                    git_patch = None
 
-            if git_meta["origin"]:
+            if git_meta.get("origin"):
                 origin = git_meta["origin"]
                 directory = git_meta["origin"].split("/")[-1].split(".")[0]
                 clone_text = CLONE_TEXT.format(origin=origin, directory=directory)
@@ -956,16 +974,20 @@ class DownloadManager:
                     patch_text = "git apply git_diff.patch"
                 else:
                     patch_text = ""
-                if git_meta["branch"]:
+                if git_meta.get("branch"):
                     git_meta["branch"] = git_meta["branch"].split("/")[-1]
 
-                template = README_TEMPLATE.format(
-                    clone_text=clone_text,
-                    patch_text=patch_text,
-                    branch=git_meta["branch"],
-                    parent=git_meta["parent"],
-                )
-                self.summary["git"] += 1
+                if git_meta:
+                    template = README_TEMPLATE.format(
+                        clone_text=clone_text,
+                        patch_text=patch_text,
+                        branch=git_meta.get("branch"),
+                        parent=git_meta.get("parent"),
+                    )
+                    self.summary["git"] += 1
+                else:
+                    template = "No git information was available."
+
                 with open(filepath, "w") as f:
                     f.write(template)
 

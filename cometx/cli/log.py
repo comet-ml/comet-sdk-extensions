@@ -279,11 +279,11 @@ def log_experiment_code_from_file(experiment, filename):
         raise Exception("cannot log code: %r; use filename or folder" % filename)
 
 def set_experiments_other(experiments, key, value):
-    if "{random}" in value:
-        from ..generate_utils import generate_experiment_name
+    from ..generate_utils import generate_experiment_name
 
-    for experiment in experiments:
+    for count, experiment in enumerate(experiments):
         new_value = value.replace("{random}", generate_experiment_name())
+        new_value = value.replace("{count}", str(count + 1))
         experiment.log_other(key, new_value)
 
 def log_experiment_metrics_from_file(experiment, filename):
