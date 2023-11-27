@@ -101,6 +101,12 @@ def get_parser_arguments(parser):
         default=None,
     )
     parser.add_argument(
+        "--query",
+        help="A Comet Query string, see https://www.comet.com/docs/v2/api-and-sdk/python-sdk/reference/API/#apiquery",
+        type=str,
+        default=None,
+    )
+    parser.add_argument(
         "--debug",
         help="If given, allow debugging",
         default=False,
@@ -136,6 +142,19 @@ def create_experiment(workspace, project_name):
         log_env_host=False,
         log_env_cpu=False,
     )
+
+def get_query_experiments(api, query_string, workspace, project_name):
+    from comet_ml.query import (Environment, Metadata, Metric, Other, Parameter, Tag)
+    env = {
+        "Environment": Environment,
+        "Metadata": Metadata,
+        "Metric": Metric,
+        "Other": Other,
+        "Parameter": Parameter,
+        "Tag": Tag,
+    }
+    query = eval(query_string, env)
+    return api.query(workspace, project_name, query)
 
 def log_cli(parsed_args):
     experiment = None
@@ -215,6 +234,8 @@ def log_cli(parsed_args):
         key, value = parsed_args.set.split(":", 1)
         if experiment:
             experiments = [experiment]
+        elif parsed_args.query is not None:
+            experiments = get_query_experiments(api, parsed_args.query, workspace, project_name)
         else:
             experiments = api.get_experiments(workspace, project_name)
         set_experiments_other(experiments, key, value)
