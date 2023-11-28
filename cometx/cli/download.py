@@ -140,6 +140,12 @@ def get_parser_arguments(parser):
         default=None,
     )
     parser.add_argument(
+        "--query",
+        help="Only download experiments that match this Comet query string",
+        type=str,
+        default=None,
+    )
+    parser.add_argument(
         "--asset-type",
         help="Only get assets with this type",
         type=str,
@@ -181,6 +187,7 @@ def download(parsed_args, remaining=None):
             overwrite=parsed_args.overwrite,
             skip=parsed_args.skip,
             debug=parsed_args.debug,
+            query=parsed_args.query,
         )
     except InvalidRestAPIKey:
         display_invalid_api_key()

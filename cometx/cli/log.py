@@ -43,7 +43,7 @@ import sys
 
 from comet_ml import ExistingExperiment, Experiment, API
 
-from ..utils import get_file_extension
+from ..utils import get_file_extension, get_query_experiments
 
 ADDITIONAL_ARGS = False
 # From filename extension to Comet Asset Type
@@ -142,19 +142,6 @@ def create_experiment(workspace, project_name):
         log_env_host=False,
         log_env_cpu=False,
     )
-
-def get_query_experiments(api, query_string, workspace, project_name):
-    from comet_ml.query import (Environment, Metadata, Metric, Other, Parameter, Tag)
-    env = {
-        "Environment": Environment,
-        "Metadata": Metadata,
-        "Metric": Metric,
-        "Other": Other,
-        "Parameter": Parameter,
-        "Tag": Tag,
-    }
-    query = eval(query_string, env)
-    return api.query(workspace, project_name, query)
 
 def log_cli(parsed_args):
     experiment = None

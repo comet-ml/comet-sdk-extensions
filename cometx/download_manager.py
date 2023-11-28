@@ -37,7 +37,7 @@ from comet_ml.utils import makedirs
 
 from ._typing import Any, List, Optional
 from ._version import __version__
-from .utils import _input_user_yn
+from .utils import _input_user_yn, get_query_experiments
 
 LOGGER = logging.getLogger(__name__)
 
@@ -218,13 +218,16 @@ class DownloadManager:
         overwrite=False,
         skip=False,
         debug=False,
+        query=None,
     ):
-        # type: (Optional[str], Optional[List[str]], Optional[List[str]], Optional[str], Optional[bool], Optional[bool], Optional[bool], Optional[bool], Optional[str], Optional[str], Optional[bool]) -> None
+        # type: (Optional[str], Optional[List[str]], Optional[List[str]], Optional[str], Optional[bool], Optional[bool], Optional[bool], Optional[bool], Optional[str], Optional[str], Optional[bool], Optional[str]) -> None
         """
         The top-level method to download resources.
 
         Args:
             comet_path: (str, optional) the Comet path to the experiment, artifact, or model-registry
+            query: (str, option) a Comet query string. See:
+                https://www.comet.com/docs/v2/api-and-sdk/python-sdk/reference/API/#apiquery
             include: (list of str, optional) experiment resources to include in download
             skip: if True, skip experiments if they have been previously downloaded
             ignore: (list of str, optional) experiment resources to ignore
@@ -365,9 +368,9 @@ class DownloadManager:
                 workspace = args[0]
                 project_name = args[1]
                 if list_items:
-                    self.list_project(workspace, project_name)
+                    self.list_project(workspace, project_name, query=query)
                 else:
-                    self.download_project(workspace, project_name)
+                    self.download_project(workspace, project_name, query=query)
             elif len(args) == 3:
                 # "workspace/project/experiment"
                 experiment = self.api.get(comet_path)
@@ -522,7 +525,17 @@ class DownloadManager:
         for project_name in sorted(projects):
             print("%s/%s" % (workspace, project_name))
 
-    def list_project(self, workspace, project_name):
+    def get_experiments(self, workspace, project_name, query):
+        """
+        Return the experiments, possibly matching a query string.
+        """
+        if query:
+            experiments = get_query_experiments(self.api, query, workspace, project_name)
+        else:
+            experiments = self.api.get_experiments(workspace, project_name)
+        return experiments
+
+    def list_project(self, workspace, project_name, query=None):
         # type: (str, str) -> None
         """
         List the project's experiments, one per line.
@@ -532,7 +545,7 @@ class DownloadManager:
             project_name: (str) name of project
         """
         self.verify_workspace(workspace)
-        experiments = self.api.get_experiments(workspace, project_name)
+        experiments = self.get_experiments(workspace, project_name, query)
         for experiment in experiments:
             if self.use_name:
                 print(
@@ -1180,7 +1193,7 @@ class DownloadManager:
             except Exception as err:
                 print("Error in experiment %r: %s" % (function, err))
 
-    def download_project(self, workspace, project_name, top_level=True):
+    def download_project(self, workspace, project_name, top_level=True, query=None):
         # type: (str, str, Optional[bool]) -> None
         """
         Download a project.
@@ -1188,6 +1201,7 @@ class DownloadManager:
         Args:
             workspace: (str) name of workspace
             project_name: (str) name of project
+            query: (str, optional) Comet query string
             top_level: (bool, optional) is this the top of the download
                 hierarchy?
         """
@@ -1214,7 +1228,7 @@ class DownloadManager:
                 with open(filepath, "w") as f:
                     f.write(notes)
 
-        project_experiments = self.api.get_experiments(workspace, project_name)
+        project_experiments = self.get_experiments(workspace, project_name, query)
         if top_level:
             if self.flat:
                 raise ValueError(
@@ -1229,7 +1243,7 @@ class DownloadManager:
         for experiment in project_experiments:
             self.download_experiment(experiment, top_level=False)
 
-    def download_workspace(self, workspace, top_level=True):
+    def download_workspace(self, workspace, top_level=True, query=None):
         # type: (str, Optional[bool]) -> None
         """
         Download a workspace.
@@ -1260,6 +1274,7 @@ class DownloadManager:
                 workspace,
                 project_name,
                 top_level=False,
+                query=query,
             )
 
     def _confirm_download(self, total):

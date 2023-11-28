@@ -39,6 +39,12 @@ def get_parser_arguments(parser):
         action="store_true",
         default=False,
     )
+    parser.add_argument(
+        "--query",
+        help="Only list experiments that match this Comet query string",
+        type=str,
+        default=None,
+    )
 
 
 def list(parsed_args, remaining=None):
@@ -53,6 +59,7 @@ def list(parsed_args, remaining=None):
             comet_path=parsed_args.COMET_PATH,
             use_name=parsed_args.use_name,
             list_items=True,
+            query=parsed_args.query,
         )
     except InvalidRestAPIKey:
         display_invalid_api_key()

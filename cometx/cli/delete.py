@@ -38,7 +38,7 @@ import sys
 
 from comet_ml import API
 
-from ..utils import get_file_extension
+from ..utils import get_file_extension, get_query_experiments
 
 ADDITIONAL_ARGS = False
 def get_parser_arguments(parser):
@@ -63,6 +63,12 @@ def get_parser_arguments(parser):
         help="If given, allow debugging",
         default=False,
         action="store_true"
+    )
+    parser.add_argument(
+        "--query",
+        help="Only delete experiments that match this Comet query string",
+        type=str,
+        default=None,
     )
 
 
@@ -104,6 +110,8 @@ def delete_cli(parsed_args):
 
     if experiment_key:
         experiments = [api.get_experiment(workspace, project_name, experiment_key)]
+    elif parsed_args.query is not None:
+        experiments = get_query_experiments(api, parsed_args.query, workspace, project_name)
     else:
         experiments = api.get_experiments(workspace, project_name)
     
