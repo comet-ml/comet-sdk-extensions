@@ -13,14 +13,12 @@
 # ****************************************
 
 import argparse
-import sys
 import os
+import sys
 
-from comet_ml.exceptions import InvalidRestAPIKey
 from comet_ml.utils import makedirs
 
 from cometx.download_manager import DownloadManager, clean_comet_path
-from cometx.utils import display_invalid_api_key
 
 ADDITIONAL_ARGS = False
 
@@ -36,27 +34,22 @@ def get_parser_arguments(parser):
     )
     parser.add_argument(
         "OUTPUT_DIR",
-        help=(
-            "The directory to copy files in order to reproduce the experiment"
-        ),
+        help=("The directory to copy files in order to reproduce the experiment"),
         type=str,
     )
     parser.add_argument(
         "--run",
-        help=(
-            "Run the reproducable script"
-        ),
+        help=("Run the reproducable script"),
         action="store_true",
         default=False,
     )
     parser.add_argument(
         "--executable",
-        help=(
-            "Run the reproducable script"
-        ),
+        help=("Run the reproducable script"),
         type=str,
         default="python",
     )
+
 
 def reproduce(parsed_args, remaining=None):
     comet_path = (
@@ -64,7 +57,10 @@ def reproduce(parsed_args, remaining=None):
     )
 
     if len(comet_path) != 3:
-        raise Exception("invalid COMET_PATH: %r; requires workspace/project/experiment" % parsed_args.COMET_PATH)
+        raise Exception(
+            "invalid COMET_PATH: %r; requires workspace/project/experiment"
+            % parsed_args.COMET_PATH
+        )
     else:
         comet_path = clean_comet_path("/".join(comet_path))
 
@@ -79,18 +75,18 @@ def reproduce(parsed_args, remaining=None):
     manager.summary = {key: 0 for key in manager.RESOURCE_FUNCTIONS.keys()}
     manager.summary["artifacts"] = 0
     manager.summary["model-registry"] = 0
-        
+
     experiment = manager.api.get(comet_path)
     if experiment is None:
-        raise Exception("invalid experiment: %r; not found, or not available" % comet_path)
+        raise Exception(
+            "invalid experiment: %r; not found, or not available" % comet_path
+        )
 
     makedirs(parsed_args.OUTPUT_DIR, exist_ok=True)
     manager.download_code(experiment)
     manager.download_git(experiment)
     manager.download_requirements(experiment)
-    for asset_filename in [
-            "conda-spec.txt", "conda-info.yml", "conda-environment.yml"
-    ]:
+    for asset_filename in ["conda-spec.txt", "conda-info.yml", "conda-environment.yml"]:
         manager.download_asset(experiment, asset_filename)
 
     shell_commands = ""

@@ -41,6 +41,8 @@ from comet_ml import API
 from ..utils import get_file_extension, get_query_experiments
 
 ADDITIONAL_ARGS = False
+
+
 def get_parser_arguments(parser):
     parser.add_argument(
         "COMET_PATH",
@@ -59,10 +61,7 @@ def get_parser_arguments(parser):
         default=None,
     )
     parser.add_argument(
-        "--debug",
-        help="If given, allow debugging",
-        default=False,
-        action="store_true"
+        "--debug", help="If given, allow debugging", default=False, action="store_true"
     )
     parser.add_argument(
         "--query",
@@ -111,11 +110,14 @@ def delete_cli(parsed_args):
     if experiment_key:
         experiments = [api.get_experiment(workspace, project_name, experiment_key)]
     elif parsed_args.query is not None:
-        experiments = get_query_experiments(api, parsed_args.query, workspace, project_name)
+        experiments = get_query_experiments(
+            api, parsed_args.query, workspace, project_name
+        )
     else:
         experiments = api.get_experiments(workspace, project_name)
-    
+
     delete_experiment_assets(api, experiments, parsed_args.type)
+
 
 def delete_experiment_assets(api, experiments, asset_type):
     count = 0
@@ -126,6 +128,7 @@ def delete_experiment_assets(api, experiments, asset_type):
             api._client.delete_experiment_asset(experiment.id, asset["assetId"])
             count += 1
     print("Deleted %d assets of type %r" % (count, asset_type))
+
 
 def main(args):
     parser = argparse.ArgumentParser(

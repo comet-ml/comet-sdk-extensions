@@ -43,12 +43,13 @@ import json
 import os
 import sys
 
-from comet_ml import Experiment, API, APIExperiment
-from comet_ml.messages import StandardOutputMessage, InstalledPackagesMessage, HtmlMessage, MetricMessage
-
-
-from cometx.utils import get_file_extension
-
+from comet_ml import API, APIExperiment, Experiment
+from comet_ml.messages import (
+    HtmlMessage,
+    InstalledPackagesMessage,
+    MetricMessage,
+    StandardOutputMessage,
+)
 
 ADDITIONAL_ARGS = False
 
@@ -63,22 +64,17 @@ def get_parser_arguments(parser):
     )
     parser.add_argument(
         "COMET_DESTINATION",
-        help=(
-            "The Comet destination: 'WORKSPACE', 'WORKSPACE/PROJECT'"
-        ),
+        help=("The Comet destination: 'WORKSPACE', 'WORKSPACE/PROJECT'"),
         type=str,
     )
     parser.add_argument(
-        "--debug",
-        help="If given, allow debugging",
-        default=False,
-        action="store_true"
+        "--debug", help="If given, allow debugging", default=False, action="store_true"
     )
     parser.add_argument(
         "--symlink",
         help="Instead of copying, create a link to an experiment in a project",
         default=False,
-        action="store_true"
+        action="store_true",
     )
 
 
@@ -93,6 +89,7 @@ def copy(parsed_args, remaining=None):
             raise
         else:
             print("ERROR: " + str(exc))
+
 
 def create_experiment(workspace_dst, project_dst):
     """
@@ -135,6 +132,7 @@ def create_experiment(workspace_dst, project_dst):
 def get_experiment_folders(workspace_src, project_src, experiment_src):
     yield from glob.iglob(f"{workspace_src}/{project_src}/{experiment_src}")
 
+
 def copy_experiment_to(experiment_folder, workspace_dst, project_dst):
     title = experiment_folder
     # See if there is a name:
@@ -156,6 +154,7 @@ def copy_experiment_to(experiment_folder, workspace_dst, project_dst):
     log_all(experiment, experiment_folder)
     experiment.end()
     print(f"    New experiment created: {experiment.url}")
+
 
 def remove_extra_slashes(path):
     if path:
@@ -206,18 +205,28 @@ def copy_cli(parsed_args):
     # First check to make sure workspace_dst exists:
     workspaces = api.get_workspaces()
     if workspace_dst not in workspaces:
-        raise Exception(f"{workspace_dst} does not exist; use the Comet UI to create it")
+        raise Exception(
+            f"{workspace_dst} does not exist; use the Comet UI to create it"
+        )
 
-    for experiment_folder in get_experiment_folders(workspace_src, project_src, experiment_src):
-        _, folder_workspace, folder_project, folder_experiment = ("/" + experiment_folder).rsplit("/", 3)
+    for experiment_folder in get_experiment_folders(
+        workspace_src, project_src, experiment_src
+    ):
+        _, folder_workspace, folder_project, folder_experiment = (
+            "/" + experiment_folder
+        ).rsplit("/", 3)
         temp_project_dst = project_dst
         if temp_project_dst is None:
             temp_project_dst = folder_project
         if parsed_args.symlink:
-            print(f"Creating symlink from {workspace_src}/{project_src}/{experiment_src} to {workspace_dst}/{temp_project_dst}")
+            print(
+                f"Creating symlink from {workspace_src}/{project_src}/{experiment_src} to {workspace_dst}/{temp_project_dst}"
+            )
             experiment = APIExperiment(previous_experiment=experiment_src)
             experiment.create_symlink(temp_project_dst)
-            print(f"    New symlink created: {api._get_url_server()}/{workspace_dst}/{temp_project_dst}/{experiment_src}")
+            print(
+                f"    New symlink created: {api._get_url_server()}/{workspace_dst}/{temp_project_dst}/{experiment_src}"
+            )
         else:
             copy_experiment_to(experiment_folder, workspace_dst, temp_project_dst)
 
@@ -231,14 +240,16 @@ def log_metadata(experiment, filename):
         metadata = json.load(open(filename))
         experiment.add_tags(metadata["tags"])
         # FIXME: missing:
-        ##  throttle data
-        ##  durationMillis
-        ##  startTimeMillis
-        ##  endTimeMillis
+        #  throttle data
+        #  durationMillis
+        #  startTimeMillis
+        #  endTimeMillis
+
 
 def log_graph(experiment, filename):
     if os.path.exists(filename):
         experiment.set_model_graph(open(filename).read())
+
 
 def log_assets(experiment, path, assets_metadata):
     """
@@ -276,15 +287,15 @@ def log_assets(experiment, path, assets_metadata):
         if not os.path.isfile(filename):
             print("Missing file %r: unable to copy" % filename)
             continue
-            
+
         metadata = assets_metadata[log_filename].get("metadata")
         metadata = json.loads(metadata) if metadata else {}
 
         if asset_type == "notebook":
             experiment.log_notebook(filename)  # done!
-            #elif asset_type == "confusion-matrix":
+            # elif asset_type == "confusion-matrix":
             # TODO: what to do about assets referenced in matrix?
-            #elif asset_type == "embedding":
+            # elif asset_type == "embedding":
             # TODO: what to do about assets referenced in embedding?
         else:
             binary_io = open(filename, "rb")
@@ -298,14 +309,15 @@ def log_assets(experiment, path, assets_metadata):
                 step=assets_metadata[log_filename].get("step", None),
             )  # done!
 
+
 def log_code(experiment, filename):
-    """
-    """
+    """ """
     if os.path.exists(filename):
         if os.path.isfile(filename):
             experiment.log_code(str(filename))
         elif os.path.isdir(filename):
             experiment.log_code(folder=str(filename))
+
 
 def log_requirements(experiment, filename):
     """
@@ -322,9 +334,9 @@ def log_requirements(experiment, filename):
         )
         experiment._enqueue_message(message)
 
+
 def log_metrics(experiment, filename):
-    """
-    """
+    """ """
     if os.path.exists(filename):
         for line in open(filename):
             dict_line = json.loads(line)
@@ -343,9 +355,9 @@ def log_metrics(experiment, filename):
             message.set_metric(name, value, step=step, epoch=epoch)
             experiment._enqueue_message(message)
 
+
 def log_parameters(experiment, filename):
-    """
-    """
+    """ """
     if os.path.exists(filename):
         parameters = json.load(open(filename))
         for parameter in parameters:
@@ -353,9 +365,9 @@ def log_parameters(experiment, filename):
             value = parameter["valueCurrent"]
             experiment.log_parameter(name, value)
 
+
 def log_others(experiment, filename):
-    """
-    """
+    """ """
     if os.path.exists(filename):
         for line in open(filename):
             dict_line = json.loads(line)
@@ -363,9 +375,9 @@ def log_others(experiment, filename):
             value = dict_line["valueCurrent"]
             experiment.log_other(key=name, value=value)
 
+
 def log_output(experiment, output_file):
-    """
-    """
+    """ """
     if os.path.exists(output_file):
         for line in open(output_file):
             message = StandardOutputMessage.create(
@@ -375,6 +387,7 @@ def log_output(experiment, output_file):
                 stderr=False,
             )
             experiment._enqueue_message(message)
+
 
 def log_html(experiment, filename):
     if os.path.exists(filename):
@@ -386,31 +399,21 @@ def log_html(experiment, filename):
         )
         experiment._enqueue_message(message)
 
+
 def log_all(experiment, experiment_folder):
-    """
-    """
+    """ """
     # FIXME: missing notes (edited by human, not logged programmatically)
-    log_metrics(
-        experiment,
-        os.path.join(experiment_folder, "metrics.jsonl")
-    )
+    log_metrics(experiment, os.path.join(experiment_folder, "metrics.jsonl"))
 
-    log_metadata(
-        experiment,
-        os.path.join(experiment_folder, "metadata.json")
-    )
+    log_metadata(experiment, os.path.join(experiment_folder, "metadata.json"))
 
-    log_parameters(
-        experiment,
-        os.path.join(experiment_folder, "parameters.json")
-    )
+    log_parameters(experiment, os.path.join(experiment_folder, "parameters.json"))
 
-    log_others(
-        experiment,
-        os.path.join(experiment_folder, "others.jsonl")
-    )
+    log_others(experiment, os.path.join(experiment_folder, "others.jsonl"))
 
-    assets_metadata_filename = os.path.join(experiment_folder, "assets", "assets_metadata.jsonl")
+    assets_metadata_filename = os.path.join(
+        experiment_folder, "assets", "assets_metadata.jsonl"
+    )
     assets_metadata = {}
     if os.path.exists(assets_metadata_filename):
         for line in open(assets_metadata_filename):
@@ -418,25 +421,16 @@ def log_all(experiment, experiment_folder):
             assets_metadata[data["fileName"]] = data
 
         log_assets(
-            experiment,
-            os.path.join(experiment_folder, "assets"),
-            assets_metadata
+            experiment, os.path.join(experiment_folder, "assets"), assets_metadata
         )
 
-    log_output(
-        experiment,
-        os.path.join(experiment_folder, "run/output.txt")
-    )
+    log_output(experiment, os.path.join(experiment_folder, "run/output.txt"))
 
     log_requirements(
-        experiment,
-        os.path.join(experiment_folder, "run/requirements.txt")
+        experiment, os.path.join(experiment_folder, "run/requirements.txt")
     )
 
-    log_graph(
-        experiment,
-        os.path.join(experiment_folder, "run/graph_definition.txt")
-    )
+    log_graph(experiment, os.path.join(experiment_folder, "run/graph_definition.txt"))
 
     log_html(
         experiment,
@@ -445,6 +439,7 @@ def log_all(experiment, experiment_folder):
 
     # FIXME:
     ## models
+
 
 def main(args):
     parser = argparse.ArgumentParser(

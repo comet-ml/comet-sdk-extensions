@@ -30,7 +30,7 @@ import sys
 from cometx import __version__
 
 # Import CLI commands:
-from . import download, list_command, log, reproduce, delete, copy
+from . import copy, delete, download, list_command, log, reproduce
 
 
 def add_subparser(subparsers, module, name):

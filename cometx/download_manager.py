@@ -21,8 +21,8 @@ import io
 import json
 import logging
 import os
-import zipfile
 import re
+import zipfile
 
 try:
     from tqdm import tqdm as ProgressBar
@@ -74,6 +74,7 @@ git checkout {branch}
 git checkout {parent}
 {patch_text}
 """
+
 
 def is_same(name1, name2):
     # type: (Any, Any) -> bool
@@ -530,7 +531,9 @@ class DownloadManager:
         Return the experiments, possibly matching a query string.
         """
         if query:
-            experiments = get_query_experiments(self.api, query, workspace, project_name)
+            experiments = get_query_experiments(
+                self.api, query, workspace, project_name
+            )
         else:
             experiments = self.api.get_experiments(workspace, project_name)
         return experiments
@@ -617,7 +620,10 @@ class DownloadManager:
             retval = re.search(self.filename, filepath)
             if self.debug:
                 if not retval:
-                    print("    skipping %r, does not match filename %r" % (filepath, self.filename))
+                    print(
+                        "    skipping %r, does not match filename %r"
+                        % (filepath, self.filename)
+                    )
                 else:
                     print("    writing matched %r" % filepath)
             return retval
@@ -633,7 +639,7 @@ class DownloadManager:
             if self.debug:
                 print("    writing %r" % filepath)
             return True
-        
+
     def download_graph(self, experiment):
         # type: (APIExperiment) -> None
         """
@@ -946,7 +952,7 @@ class DownloadManager:
             except Exception:
                 print("Not allowed to get git patch for experiment")
                 git_patch = None
-                
+
             git_patch_loaded = True
             if git_patch:
                 try:

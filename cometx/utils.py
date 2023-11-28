@@ -11,18 +11,12 @@
 #      Team. All rights reserved.
 # ****************************************
 
-import io
-import json
 import os
-import sqlite3
 import sys
-import tempfile
-import zipfile
-
-from comet_ml.config import get_config
-from comet_ml.utils import clean_string, get_root_url
 
 import six
+from comet_ml.config import get_config
+from comet_ml.utils import clean_string, get_root_url
 
 
 class ProgressBar:
@@ -71,6 +65,7 @@ def _input_user_yn(prompt):
             break
     return response.startswith("y")
 
+
 def get_file_extension(file_path):
     if file_path is None:
         return None
@@ -95,8 +90,9 @@ def display_invalid_api_key(api_key=None, cloud_url=None):
         )
     )
 
+
 def get_query_experiments(api, query_string, workspace, project_name):
-    from comet_ml.query import (Environment, Metadata, Metric, Other, Parameter, Tag)
+    from comet_ml.query import Environment, Metadata, Metric, Other, Parameter, Tag
 
     env = {
         "Environment": Environment,

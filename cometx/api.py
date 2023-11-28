@@ -13,6 +13,7 @@
 
 from comet_ml import API
 
+
 class API(API):
     def get_panels(self, workspace):
         """
@@ -97,14 +98,13 @@ class API(API):
                 "code-panel/download", {"instanceId": instance_id}
             )
         return results
-            
+
     def download_panel_zip(self, template_id, filename=None):
         """
         Download a panel zip file.
         """
         results = self._client.get_from_endpoint(
-            f"template/{template_id}/download", {},
-            return_type="binary"
+            f"template/{template_id}/download", {}, return_type="binary"
         )
         filename = filename if filename else f"panel-{template_id}.zip"
         with open(filename, "wb") as fp:
@@ -116,6 +116,6 @@ class API(API):
         Upload a panel zip file to a workspace.
         """
         results = self._client.post_from_endpoint(
-            "write/template/upload", {"teamId": workspace_id},
-            files={"file": filename}
+            "write/template/upload", {"teamId": workspace_id}, files={"file": filename}
         )
+        return results

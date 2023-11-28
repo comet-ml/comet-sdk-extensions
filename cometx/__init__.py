@@ -12,9 +12,10 @@
 # ****************************************
 
 import os
+
 # To keep comet_ml logger silent:
 os.environ["COMET_LOGGING_CONSOLE"] = "CRITICAL"
 
 from ._version import __version__  # noqa
-from .download_manager import DownloadManager  # noqa
 from .api import API  # noqa
+from .download_manager import DownloadManager  # noqa

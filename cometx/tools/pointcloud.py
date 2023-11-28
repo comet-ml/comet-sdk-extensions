@@ -11,12 +11,11 @@
 #      Team. All rights reserved.
 # ****************************************
 
-import math
 import json
-import tempfile
+import math
 import os
 import pathlib
-
+import tempfile
 from collections import defaultdict
 
 try:
@@ -25,6 +24,7 @@ except ImportError:
     Image, ImageDraw = None, None
 
 ## 3D Graphics functions
+
 
 def identity():
     """
@@ -37,6 +37,7 @@ def identity():
         [0, 0, 0, 1],
     ]
 
+
 def rotate_x(angle):
     """
     Return transform matrix for rotation around x axis.
@@ -46,8 +47,9 @@ def rotate_x(angle):
         [1, 0, 0, 0],
         [0, math.cos(radians), -math.sin(radians), 0],
         [0, math.sin(radians), math.cos(radians), 0],
-        [0, 0, 0, 1]
+        [0, 0, 0, 1],
     ]
+
 
 def rotate_y(angle):
     """
@@ -58,8 +60,9 @@ def rotate_y(angle):
         [math.cos(radians), 0, math.sin(radians), 0],
         [0, 1, 0, 0],
         [-math.sin(radians), 0, math.cos(radians), 0],
-        [0, 0, 0, 1]
+        [0, 0, 0, 1],
     ]
+
 
 def rotate_z(angle):
     """
@@ -70,8 +73,9 @@ def rotate_z(angle):
         [math.cos(radians), -math.sin(radians), 0, 0],
         [math.sin(radians), math.cos(radians), 0, 0],
         [0, 0, 1, 0],
-        [0, 0, 0, 1]
+        [0, 0, 0, 1],
     ]
+
 
 def translate_xyz(x, y, z):
     """
@@ -84,6 +88,7 @@ def translate_xyz(x, y, z):
         [0, 0, 0, 1],
     ]
 
+
 def scale_xyz(x, y, z):
     """
     Return transform matrix for scaling.
@@ -94,6 +99,7 @@ def scale_xyz(x, y, z):
         [0, 0, z, 0],
         [0, 0, 0, 1],
     ]
+
 
 def matmul(a, b):
     """
@@ -109,16 +115,27 @@ def matmul(a, b):
             c[y][x] = acc
     return c
 
+
 def multiply_point_by_matrix(matrix, point):
     """
     Multiply a point by a matrix. Written in Pure Python
     to avoid dependency on numpy.
     """
     return [
-        (point[0] * matrix[0][0]) + (point[1] * matrix[0][1]) + (point[2] * matrix[0][2]) + (1 * matrix[0][3]),
-        (point[0] * matrix[1][0]) + (point[1] * matrix[1][1]) + (point[2] * matrix[1][2]) + (1 * matrix[1][3]),
-        (point[0] * matrix[2][0]) + (point[1] * matrix[2][1]) + (point[2] * matrix[2][2]) + (1 * matrix[2][3])
+        (point[0] * matrix[0][0])
+        + (point[1] * matrix[0][1])
+        + (point[2] * matrix[0][2])
+        + (1 * matrix[0][3]),
+        (point[0] * matrix[1][0])
+        + (point[1] * matrix[1][1])
+        + (point[2] * matrix[1][2])
+        + (1 * matrix[1][3]),
+        (point[0] * matrix[2][0])
+        + (point[1] * matrix[2][1])
+        + (point[2] * matrix[2][2])
+        + (1 * matrix[2][3]),
     ]
+
 
 def point_to_canvas(size, point, z=False):
     """
@@ -130,6 +147,7 @@ def point_to_canvas(size, point, z=False):
     else:
         return [int(size[0] - point[0]), int(point[1])]
 
+
 def draw_line(size, canvas, transform, a, b, color):
     """
     Draw a line on the canvas given two points and transform.
@@ -138,12 +156,14 @@ def draw_line(size, canvas, transform, a, b, color):
     tb = point_to_canvas(size, multiply_point_by_matrix(transform, b))
     canvas.line(ta + tb, fill=color)
 
+
 def draw_point(size, canvas, transform, point, color):
     """
     Draw a point on the canvas given the transform.
     """
     p = point_to_canvas(size, multiply_point_by_matrix(transform, point))
     canvas.point(p, fill=color)
+
 
 def draw_point_fake(size, fcanvas, transform, point, color):
     """
@@ -154,15 +174,18 @@ def draw_point_fake(size, fcanvas, transform, point, color):
     if location is None or location["z"] < p[2]:
         fcanvas[(p[0], p[1])] = {"z": p[2], "color": color}
 
-def render(points_filename, boxes_filename, x, y, z, min_max_x, min_max_y, min_max_z, size):
+
+def render(
+    points_filename, boxes_filename, x, y, z, min_max_x, min_max_y, min_max_z, size
+):
     """
     Given to files, points and boxes, rotations (in degrees) on x, y ,z, and ranges,
     create an image.
     """
     if Image is None:
         raise Exception("Python Image Library is not installed; pip install PIL")
-    
-    background_color = (51, 51, 77) # Skybox color
+
+    background_color = (51, 51, 77)  # Skybox color
 
     image = Image.new("RGB", size, background_color)
     canvas = ImageDraw.Draw(image)
@@ -174,8 +197,8 @@ def render(points_filename, boxes_filename, x, y, z, min_max_x, min_max_y, min_m
     ]
 
     scale = min(
-        size[0]/abs(min_max_x[0] - min_max_x[1]),
-        size[1]/abs(min_max_y[0] - min_max_y[1]),
+        size[0] / abs(min_max_x[0] - min_max_x[1]),
+        size[1] / abs(min_max_y[0] - min_max_y[1]),
     )
     transform = identity()
     # First, center it around zero:
@@ -187,7 +210,7 @@ def render(points_filename, boxes_filename, x, y, z, min_max_x, min_max_y, min_m
     # And then scale
     transform = matmul(transform, scale_xyz(scale, scale, scale))
     # Finally, put it in center of window:
-    transform = matmul(transform, translate_xyz(size[0]/2, size[1]/2, 0))
+    transform = matmul(transform, translate_xyz(size[0] / 2, size[1] / 2, 0))
 
     # Fake canvas:
     fcanvas = defaultdict(lambda: None)
@@ -211,8 +234,8 @@ def render(points_filename, boxes_filename, x, y, z, min_max_x, min_max_y, min_m
     # draw fake on canvas
     if fcanvas:
         for x, y in fcanvas:
-            color = fcanvas[(x,y)]["color"]
-            canvas.point((x,y), fill=color)
+            color = fcanvas[(x, y)]["color"]
+            canvas.point((x, y), fill=color)
 
     # Draw boxes last to show on top of points
     with open(boxes_filename) as fp:
@@ -235,12 +258,22 @@ def render(points_filename, boxes_filename, x, y, z, min_max_x, min_max_y, min_m
 
     return image
 
-def create_image(points=None, boxes=None, x=45, y=0, z=45,
-                 output_filename="pointcloud.gif", swap_yz=True,
-                 x_incr=0, y_incr=0, z_incr=0, steps=0,
-                 size=(250, 250)):
-    """
-    """
+
+def create_image(
+    points=None,
+    boxes=None,
+    x=45,
+    y=0,
+    z=45,
+    output_filename="pointcloud.gif",
+    swap_yz=True,
+    x_incr=0,
+    y_incr=0,
+    z_incr=0,
+    steps=0,
+    size=(250, 250),
+):
+    """ """
     min_max_x = [float("inf"), float("-inf")]
     min_max_y = [float("inf"), float("-inf")]
     min_max_z = [float("inf"), float("-inf")]
@@ -255,7 +288,9 @@ def create_image(points=None, boxes=None, x=45, y=0, z=45,
     elif boxes is None:
         boxes = []
 
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False) as points_fp:
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".jsonl", delete=False
+    ) as points_fp:
         for point in points:
             if swap_yz:
                 point[1], point[2] = point[2], point[1]
@@ -265,7 +300,9 @@ def create_image(points=None, boxes=None, x=45, y=0, z=45,
             points_fp.write(json.dumps(point))
             points_fp.write("\n")
 
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False) as boxes_fp:
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".jsonl", delete=False
+    ) as boxes_fp:
         for box in boxes:
             for points in box["segments"]:
                 for point in points:
@@ -278,7 +315,7 @@ def create_image(points=None, boxes=None, x=45, y=0, z=45,
             boxes_fp.write("\n")
 
     if steps == 0:
-        image =  render(
+        image = render(
             points_fp.name,
             boxes_fp.name,
             x,
@@ -295,7 +332,7 @@ def create_image(points=None, boxes=None, x=45, y=0, z=45,
     else:
         images = []
         for step in range(steps):
-            image =  render(
+            image = render(
                 points_fp.name,
                 boxes_fp.name,
                 x,
@@ -312,7 +349,7 @@ def create_image(points=None, boxes=None, x=45, y=0, z=45,
             z += z_incr
 
         for step in range(steps):
-            image =  render(
+            image = render(
                 points_fp.name,
                 boxes_fp.name,
                 x,
@@ -335,6 +372,6 @@ def create_image(points=None, boxes=None, x=45, y=0, z=45,
             append_images=images[1:],
             optimize=True,
             duration=80,
-            loop=0
+            loop=0,
         )
         return images

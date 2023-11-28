@@ -41,7 +41,7 @@ import json
 import os
 import sys
 
-from comet_ml import ExistingExperiment, Experiment, API
+from comet_ml import API, ExistingExperiment, Experiment
 
 from ..utils import get_file_extension, get_query_experiments
 
@@ -107,10 +107,7 @@ def get_parser_arguments(parser):
         default=None,
     )
     parser.add_argument(
-        "--debug",
-        help="If given, allow debugging",
-        default=False,
-        action="store_true"
+        "--debug", help="If given, allow debugging", default=False, action="store_true"
     )
 
 
@@ -142,6 +139,7 @@ def create_experiment(workspace, project_name):
         log_env_host=False,
         log_env_cpu=False,
     )
+
 
 def log_cli(parsed_args):
     experiment = None
@@ -180,18 +178,28 @@ def log_cli(parsed_args):
             experiment = create_experiment(workspace, project_name)
 
         if os.path.exists(os.path.join(parsed_args.FILENAME, "metrics.jsonl")):
-            log_experiment_metrics_from_file(experiment, os.path.join(parsed_args.FILENAME, "metrics.jsonl"))
+            log_experiment_metrics_from_file(
+                experiment, os.path.join(parsed_args.FILENAME, "metrics.jsonl")
+            )
 
         if os.path.exists(os.path.join(parsed_args.FILENAME, "parameters.json")):
-            log_experiment_parameters_from_file(experiment, os.path.join(parsed_args.FILENAME, "parameters.json"))
+            log_experiment_parameters_from_file(
+                experiment, os.path.join(parsed_args.FILENAME, "parameters.json")
+            )
 
         if os.path.exists(os.path.join(parsed_args.FILENAME, "others.jsonl")):
-            log_experiment_others_from_file(experiment, os.path.join(parsed_args.FILENAME, "others.jsonl"))
+            log_experiment_others_from_file(
+                experiment, os.path.join(parsed_args.FILENAME, "others.jsonl")
+            )
 
         for dirname in glob.glob(os.path.join(parsed_args.FILENAME, "assets", "*")):
             if os.path.isdir(dirname):
                 base, asset_type = dirname.rsplit("/", 1)
-                log_experiment_assets_from_file(experiment, os.path.join(parsed_args.FILENAME, "assets", asset_type, "*"), asset_type)
+                log_experiment_assets_from_file(
+                    experiment,
+                    os.path.join(parsed_args.FILENAME, "assets", asset_type, "*"),
+                    asset_type,
+                )
 
         # FIXME: output
 
@@ -222,7 +230,9 @@ def log_cli(parsed_args):
         if experiment:
             experiments = [experiment]
         elif parsed_args.query is not None:
-            experiments = get_query_experiments(api, parsed_args.query, workspace, project_name)
+            experiments = get_query_experiments(
+                api, parsed_args.query, workspace, project_name
+            )
         else:
             experiments = api.get_experiments(workspace, project_name)
         set_experiments_other(experiments, key, value)
@@ -252,10 +262,13 @@ def log_cli(parsed_args):
         if not experiment:
             experiment = create_experiment(workspace, project_name)
 
-        log_experiment_assets_from_file(experiment, parsed_args.FILENAME, parsed_args.type)
+        log_experiment_assets_from_file(
+            experiment, parsed_args.FILENAME, parsed_args.type
+        )
 
     if experiment:
         experiment.end()
+
 
 def log_experiment_assets_from_file(experiment, filename, file_type):
     SKELETON = filename
@@ -278,6 +291,7 @@ def log_experiment_assets_from_file(experiment, filename, file_type):
                 asset_type=file_type,
             )
 
+
 def log_experiment_code_from_file(experiment, filename):
     if os.path.isfile(filename):
         experiment.log_code(filename)
@@ -286,6 +300,7 @@ def log_experiment_code_from_file(experiment, filename):
     else:
         raise Exception("cannot log code: %r; use filename or folder" % filename)
 
+
 def set_experiments_other(experiments, key, value):
     from ..generate_utils import generate_experiment_name
 
@@ -293,6 +308,7 @@ def set_experiments_other(experiments, key, value):
         new_value = value.replace("{random}", generate_experiment_name())
         new_value = value.replace("{count}", str(count + 1))
         experiment.log_other(key, new_value)
+
 
 def log_experiment_metrics_from_file(experiment, filename):
     for line in open(filename):
@@ -304,6 +320,7 @@ def log_experiment_metrics_from_file(experiment, filename):
         # FIXME: does not log time
         experiment.log_metric(name=name, value=value, step=step, epoch=epoch)
 
+
 def log_experiment_parameters_from_file(experiment, filename):
     parameters = json.load(open(filename))
     for parameter in parameters:
@@ -311,12 +328,14 @@ def log_experiment_parameters_from_file(experiment, filename):
         value = parameter["valueCurrent"]
         experiment.log_parameter(name, value)
 
+
 def log_experiment_others_from_file(experiment, filename):
     for line in open(filename):
         dict_line = json.loads(line)
         name = dict_line["name"]
         value = dict_line["valueCurrent"]
         experiment.log_other(key=name, value=value)
+
 
 def main(args):
     parser = argparse.ArgumentParser(
