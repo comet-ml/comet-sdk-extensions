@@ -111,7 +111,7 @@ where DESTINATION is:
 Not all combinations are possible:
 
 
-| Destination:<br/>Source (below)| WORKSPACE            | WORKSPACE/PROJECT      |
+| Destination → <br/>Source ↓ | WORKSPACE            | WORKSPACE/PROJECT      |
 |--------------------|----------------------|------------------------|
 | `WORKSPACE/*/*`      | Copies all projects  | N/A                    |
 | `WORKSPACE/PROJ/*`   | N/A                  | Copies all experiments |
