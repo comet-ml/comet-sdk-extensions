@@ -65,7 +65,7 @@ The subcommands:
 * cometx copy
 * cometx log
 * cometx reproduce
-* cometx delete
+* cometx delete-assets
 
 ### cometx list
 
@@ -230,13 +230,13 @@ cometx log WORKSPACE/PROJECT/EXPERIMENT-KEY-OR-NAME PATH-TO-DOWNLOAD --type all
 ```
 The first version will create an experiment, and the second will log everything to an existing experiment.
 
-### cometx delete
+### cometx delete-assets
 
 To delete experiments assets:
 
 ```
-cometx delete WORKSPACE/PROJECT --type=image
-cometx delete WORKSPACE/PROJECT/EXPERIMENT --type=all
+cometx delete-assets WORKSPACE/PROJECT --type=image
+cometx delete-assets WORKSPACE/PROJECT/EXPERIMENT --type=all
 ```
 Type can be valid asset tupe, including:
 
