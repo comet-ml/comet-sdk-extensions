@@ -61,11 +61,11 @@ url_override = https://your-companys-comet.com/clientlib/
 The subcommands:
 
 * [cometx list](#cometx-list)
-* cometx download
-* cometx copy
-* cometx log
-* cometx reproduce
-* cometx delete-assets
+* [cometx download](#cometx-download)
+* [cometx copy](#cometx-copy)
+* [cometx log](#cometx-log)
+* [cometx reproduce](#cometx-reproduce)
+* [cometx delete-assets](#cometx-delete-assets)
 
 ### cometx list
 
