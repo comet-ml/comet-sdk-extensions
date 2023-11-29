@@ -14,10 +14,13 @@
 """
 Examples:
 
-To delete experiments assets:
+To delete experiments assets with optional query:
 
-$ cometx delete WORKSPACE/PROJECT --type=image
-$ cometx delete WORKSPACE/PROJECT/EXPERIMENT --type=all
+$ cometx delete-assets WORKSPACE/PROJECT --type=image --query='Other("Name") == "absolute_eagle_6153"'
+$ cometx delete-assets WORKSPACE/PROJECT/EXPERIMENT --type=all
+
+If `--query` is given as a Comet query string, only download those
+experiments that match
 
 Where TYPE is one of the following names:
 
@@ -31,14 +34,11 @@ Where TYPE is one of the following names:
 * video
 """
 import argparse
-import glob
-import json
-import os
 import sys
 
 from comet_ml import API
 
-from ..utils import get_file_extension, get_query_experiments
+from ..utils import get_query_experiments
 
 ADDITIONAL_ARGS = False
 
@@ -71,7 +71,7 @@ def get_parser_arguments(parser):
     )
 
 
-def delete(parsed_args, remaining=None):
+def delete_assets(parsed_args, remaining=None):
     # Called via `cometx delete ...`
     try:
         delete_cli(parsed_args)
@@ -136,7 +136,7 @@ def main(args):
     )
     get_parser_arguments(parser)
     parsed_args = parser.parse_args(args)
-    delete(parsed_args)
+    delete_assets(parsed_args)
 
 
 if __name__ == "__main__":

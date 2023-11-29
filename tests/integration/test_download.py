@@ -20,7 +20,6 @@ import tempfile
 import comet_ml
 from comet_ml.config import get_config
 from comet_ml.utils import proper_registry_model_name
-
 from mock import patch
 
 from cometx import DownloadManager
@@ -117,7 +116,7 @@ class TestDownload:
         # After everything has uploaded:
         exp = cls.api.get_experiment_by_key(exp.id)
         assert until(lambda: cls.MODEL_NAME in exp.get_model_names())
-        exp.register_model(cls.MODEL_NAME, stages=["Production"])
+        exp.register_model(cls.MODEL_NAME, tags=["Production"])
 
     @classmethod
     def teardown_class(cls):
@@ -465,7 +464,7 @@ class TestDownload:
         for result in results:
             assert result in actual_results
 
-    def test_download_model_stage(self, capsys):
+    def test_download_model_tag(self, capsys):
         comet_path = "%s/model-registry/%s/production" % (
             self.WORKSPACE,
             self.MODEL_NAME,

@@ -45,6 +45,8 @@ $ cometx download WORKSPACE/model-registry/NAME/VERSION-OR-STAGE [FLAGS ...]
 
 Where [FLAGS ...] is zero or more of the following:
 
+* `--query` - if given as a Comet query string, only download those
+    experiments that match
 * `--skip` - if given, skip previously downloaded experiments
 * `--list` - use to list available workspaces, projects, experiments,
     artifacts, or models
