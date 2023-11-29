@@ -60,7 +60,7 @@ url_override = https://your-companys-comet.com/clientlib/
 
 The subcommands:
 
-* cometx list
+* [cometx list](#cometx-list)
 * cometx download
 * cometx copy
 * cometx log
