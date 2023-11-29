@@ -19,7 +19,7 @@ Examples:
     cometx log
     cometx list
     cometx reproduce
-    cometx delete
+    cometx delete-assets
 
 For more information:
     cometx COMMAND --help
@@ -30,7 +30,7 @@ import sys
 from cometx import __version__
 
 # Import CLI commands:
-from . import copy, delete, download, list_command, log, reproduce
+from . import copy, delete_assets, download, list_command, log, reproduce
 
 
 def add_subparser(subparsers, module, name):
@@ -42,7 +42,7 @@ def add_subparser(subparsers, module, name):
        * comet_NAME.ADDITIONAL_ARGS is set to True/False
        * comet_NAME.get_parser_arguments is defined
     """
-    func = getattr(module, name)
+    func = getattr(module, name.replace("-", "_"))
     additional_args = module.ADDITIONAL_ARGS
     get_parser_arguments = module.get_parser_arguments
     docs = module.__doc__
@@ -72,7 +72,7 @@ def main(raw_args=sys.argv[1:]):
     add_subparser(subparsers, download, "download")
     add_subparser(subparsers, copy, "copy")
     add_subparser(subparsers, log, "log")
-    add_subparser(subparsers, delete, "delete")
+    add_subparser(subparsers, delete_assets, "delete-assets")
     add_subparser(subparsers, list_command, "list")
     add_subparser(subparsers, reproduce, "reproduce")
 

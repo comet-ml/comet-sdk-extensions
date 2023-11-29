@@ -689,13 +689,12 @@ class DownloadManager:
                     stage = None
                     done = True
                     break
-                else:
-                    for stage in version["stages"]:
-                        if is_same(version_or_stage, stage):
-                            version = None
-                            stage = stage
-                            done = True
-                            break
+                for stage in version["stages"]:
+                    if is_same(version_or_stage, stage):
+                        version = None
+                        stage = stage
+                        done = True
+                        break
 
             if not done:
                 raise ValueError("cannot find version or stage: %r" % version_or_stage)
@@ -1240,7 +1239,7 @@ class DownloadManager:
                 raise ValueError(
                     "--flat cannot be used with multiple experiment downloads"
                 )
-            if not self._confirm_download(project_metadata["numberOfExperiments"]):
+            if not self._confirm_download(len(project_experiments)):
                 return
             project_experiments = ProgressBar(
                 project_experiments, "Downloading experiments"
@@ -1297,7 +1296,7 @@ class DownloadManager:
         if self.force:
             return True
         prompt = (
-            "Consider {total} experiments for downloading resources? (y/n) ".format(
+            "Consider {total} experiments (maximum) for downloading? (y/n) ".format(
                 total=total
             )
         )
