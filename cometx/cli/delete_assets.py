@@ -72,7 +72,7 @@ def get_parser_arguments(parser):
 
 
 def delete_assets(parsed_args, remaining=None):
-    # Called via `cometx delete ...`
+    # Called via `cometx delete-assets ...`
     try:
         delete_cli(parsed_args)
     except KeyboardInterrupt:
