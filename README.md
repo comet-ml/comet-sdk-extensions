@@ -58,7 +58,41 @@ url_override = https://your-companys-comet.com/clientlib/
 
 ## Usage
 
-The subcommands:
+`cometx` is composed of a series of subcommands that are useful
+independently, and can be used together to create sophisticated tools
+for ML management.
+
+This section will examine some common uses, followed by a more
+detailed exploration of each subcommand.
+
+### Use Cases
+
+In this section we'll explore some common scenarios.
+
+1. Copy a specific project from one Comet installation to another
+2. Copy all projects in workspace to a new workspace
+3. Copy all workspaces in organization to a new organization
+4. Copy specific experiments in a project to new experiments
+
+## 1. Copy a specific project from one comet installation to another
+
+```shell
+COMET_URL_OVERRIDE=http://a.com/clientlib COMET_API_KEY=A-KEY cometx download workspace/project
+```
+
+That downloads the Comet experiment data into files. Followed by:
+
+```shell
+COMET_URL_OVERRIDE=http://b.com/clientlib COMET_API_KEY=B-KEY cometx copy workspace/project new-workspace/new-project
+```
+
+## 2. Copy all projects in workspace to a new workspace
+
+## 3. Copy all workspaces in organization to a new organization
+
+## 4. Copy specific experiments in a project to new experiments
+
+### Subcommands
 
 * [cometx list](#cometx-list)
 * [cometx download](#cometx-download)
@@ -67,7 +101,7 @@ The subcommands:
 * [cometx reproduce](#cometx-reproduce)
 * [cometx delete-assets](#cometx-delete-assets)
 
-### cometx list
+## cometx list
 
 This command is used to:
 
@@ -84,7 +118,7 @@ cometx list WORKSPACE
 cometx list
 ```
 
-### cometx copy
+## cometx copy
 
 This command is used to:
 
@@ -118,7 +152,7 @@ Not all combinations are possible:
 | `WORKSPACE/PROJ/EXP` | N/A                  | Copies experiment      |
 
 
-### cometx download
+## cometx download
 
 This command is used to:
 
@@ -178,7 +212,7 @@ cometx download WORKSPACE/model-registry/NAME [FLAGS ...]
 cometx download WORKSPACE/model-registry/NAME/VERSION-OR-STAGE [FLAGS ...]
 ```
 
-### cometx log
+## cometx log
 
 This command is used to log a file to a specific experiment.
 
@@ -230,7 +264,7 @@ cometx log WORKSPACE/PROJECT/EXPERIMENT-KEY-OR-NAME PATH-TO-DOWNLOAD --type all
 ```
 The first version will create an experiment, and the second will log everything to an existing experiment.
 
-### cometx delete-assets
+## cometx delete-assets
 
 To delete experiments assets:
 
@@ -249,7 +283,7 @@ Type can be valid asset tupe, including:
 * text-sample
 * video
 
-### cometx reproduce
+## cometx reproduce
 
 ```
 cometx reproduce [-h] [--run] [--executable EXECUTABLE] COMET_PATH OUTPUT_DIR
