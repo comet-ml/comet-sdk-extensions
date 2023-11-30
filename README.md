@@ -15,7 +15,7 @@ not an official project of Comet ML. We welcome contributions!
 ## Installation
 
 ```
-pip install git+https://github.com/comet-ml/comet-sdk-extensions.git#egg=cometx
+pip install cometx
 ```
 
 To use these command-line functions, you'll need to have your Comet
@@ -71,26 +71,77 @@ In this section we'll explore some common scenarios.
 
 1. Copy a specific project from one Comet installation to another
 2. Copy all projects in workspace to a new workspace
-3. Copy all workspaces in organization to a new organization
 4. Copy specific experiments in a project to new experiments
 
 ## 1. Copy a specific project from one comet installation to another
 
+A useful idiom is to set your Comet environment variables on the line
+of a subcommand. In this manner, you can set the `COMET_URL_OVERRIDE`
+and `COMET_API_KEY` for different installations.
+
+Of course, you don't have to set the environment variables if you are
+copying experiments on the same Comet installation.
+
+Here is how you one could download the experiments in
+WORKSPACE/PROJECT from http://comet.a.com:
+
 ```shell
-COMET_URL_OVERRIDE=http://a.com/clientlib COMET_API_KEY=A-KEY cometx download workspace/project
+COMET_URL_OVERRIDE=http://comet.a.com/clientlib \
+COMET_API_KEY=A-KEY \
+cometx download WORKSPACE/PROJECT
 ```
 
-That downloads the Comet experiment data into files. Followed by:
+The `cometx download` subcommand downloads all of the Comet experiment
+data into local files. Note that WORKSPACE/PROJECT refers to a
+workspace and project on http://comet.a.com.
+
+One could then copy the downloaded experiment data with a similar command:
 
 ```shell
-COMET_URL_OVERRIDE=http://b.com/clientlib COMET_API_KEY=B-KEY cometx copy workspace/project new-workspace/new-project
+COMET_URL_OVERRIDE=http://comet.b.com/clientlib \
+COMET_API_KEY=B-KEY \
+cometx copy WORKSPACE/PROJECT NEW-WORKSPACE/NEW-PROJECT
 ```
+
+Note that WORKSPACE/PROJECT now refers to a directory, and
+NEW-WORKSPACE/NEW-PROJECT refers to a workspace and project on
+http://comet.b.com.
 
 ## 2. Copy all projects in workspace to a new workspace
 
-## 3. Copy all workspaces in organization to a new organization
+Similarly, one can copy all of the projects by first downloading them:
 
-## 4. Copy specific experiments in a project to new experiments
+```shell
+COMET_URL_OVERRIDE=http://comet.a.com/clientlib \
+COMET_API_KEY=A-KEY \
+cometx download WORKSPACE
+```
+
+and then copying them:
+
+```shell
+COMET_URL_OVERRIDE=http://comet.b.com/clientlib \
+COMET_API_KEY=B-KEY \
+cometx copy WORKSPACE NEW-WORKSPACE
+```
+
+## 3. Copy specific experiments in a project to new experiments
+
+Similarly, one can copy a single experiment first downloading it:
+
+```shell
+COMET_URL_OVERRIDE=http://comet.a.com/clientlib \
+COMET_API_KEY=A-KEY \
+cometx download WORKSPACE/PROJECT/EXPERIMENT-NAME-OR-ID
+```
+
+and then copying it:
+
+```shell
+COMET_URL_OVERRIDE=http://comet.b.com/clientlib \
+COMET_API_KEY=B-KEY \
+cometx copy WORKSPACE/PROJECT/EXPERIMENT-NAME-OR-ID NEW-WORKSPACE/NEW-PROJECT
+```
 
 ### Subcommands
 
@@ -100,6 +151,9 @@ COMET_URL_OVERRIDE=http://b.com/clientlib COMET_API_KEY=B-KEY cometx copy worksp
 * [cometx log](#cometx-log)
 * [cometx reproduce](#cometx-reproduce)
 * [cometx delete-assets](#cometx-delete-assets)
+
+
+For all subcommands, use the `--help` flag to get additional information.
 
 ## cometx list
 
@@ -117,6 +171,8 @@ cometx list WORKSPACE/PROJECT
 cometx list WORKSPACE
 cometx list
 ```
+
+For more information, `cometx list --help`
 
 ## cometx copy
 
@@ -151,6 +207,7 @@ Not all combinations are possible:
 | `WORKSPACE/PROJ/*`   | N/A                  | Copies all experiments |
 | `WORKSPACE/PROJ/EXP` | N/A                  | Copies experiment      |
 
+For more information, `cometx copy --help`
 
 ## cometx download
 
@@ -212,9 +269,13 @@ cometx download WORKSPACE/model-registry/NAME [FLAGS ...]
 cometx download WORKSPACE/model-registry/NAME/VERSION-OR-STAGE [FLAGS ...]
 ```
 
+For more information, `cometx download --help`
+
+
 ## cometx log
 
-This command is used to log a file to a specific experiment.
+This command is used to log a resource (metrics, parameters, asset,
+etc) file to a specific experiment or experiments.
 
 cometx log example:
 
@@ -264,6 +325,8 @@ cometx log WORKSPACE/PROJECT/EXPERIMENT-KEY-OR-NAME PATH-TO-DOWNLOAD --type all
 ```
 The first version will create an experiment, and the second will log everything to an existing experiment.
 
+For more information, `cometx log --help`
+
 ## cometx delete-assets
 
 To delete experiments assets:
@@ -283,13 +346,15 @@ Type can be valid asset tupe, including:
 * text-sample
 * video
 
+For more information, `cometx delete-assets --help`
+
 ## cometx reproduce
 
 ```
 cometx reproduce [-h] [--run] [--executable EXECUTABLE] COMET_PATH OUTPUT_DIR
 ```
 
-For all variations, use the `--help` flag to get additional information.
+For more information, `cometx reproduce --help`
 
 ## Running Tests
 
