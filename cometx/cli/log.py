@@ -261,8 +261,9 @@ def set_experiments_other(experiments, key, value):
     from ..generate_utils import generate_experiment_name
 
     for count, experiment in enumerate(experiments):
-        new_value = value.replace("{random}", generate_experiment_name())
-        new_value = value.replace("{count}", str(count + 1))
+        new_value = value
+        new_value = new_value.replace("{random}", generate_experiment_name())
+        new_value = new_value.replace("{count}", str(count + 1))
         experiment.log_other(key, new_value)
 
 
