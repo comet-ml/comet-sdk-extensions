@@ -11,8 +11,10 @@
 #      Team. All rights reserved.
 # ****************************************
 
+import base64
 import os
 import sys
+import time
 
 import six
 from comet_ml.config import get_config
@@ -104,3 +106,56 @@ def get_query_experiments(api, query_string, workspace, project_name):
     }
     query = eval(query_string, env)
     return api.query(workspace, project_name, query)
+
+
+def download_url(url, output_filename, width=None, height=None, timeout=5):
+    """
+    Args:
+        url: (str) the URL to download
+        output_filename: (str) should end in ".pdf" or ".html"
+        width: (int or float) default None; if output_filename is a pdf, then
+            units are in inches. Otherwise ignored
+        height: (int or float) default None; if output_filename is a pdf, then
+            units are in inches. Otherwise ignored
+    """
+    try:
+        from selenium import webdriver
+        from selenium.webdriver.common.print_page_options import PrintOptions
+    except Exception:
+        print("Downloading urls requires selenium; pip install selenium")
+        return
+
+    options = webdriver.ChromeOptions()
+
+    driver = webdriver.Chrome(options=options)
+    driver.get(url)
+    time.sleep(timeout)
+
+    button = driver.find_element(
+        by="xpath", value='//*[@id="onetrust-reject-all-handler"]'
+    )
+    if button:
+        button.click()
+        time.sleep(2)
+
+    if output_filename.endswith(".html"):
+        page_source = driver.page_source
+        with open(output_filename, "w", encoding="utf-8") as fp:
+            fp.write(page_source)
+
+    elif output_filename.endswith(".pdf"):
+        print_options = PrintOptions()
+        # paper size should be in centimeters
+        if width is not None:
+            print_options.page_width = width * 2.54
+        if height is not None:
+            print_options.page_height = height * 2.54
+        pdf = driver.print_page(print_options=print_options)
+        pdf_bytes = base64.b64decode(pdf)
+        with open(output_filename, "wb") as fp:
+            fp.write(pdf_bytes)
+
+    else:
+        raise Exception("unknown output_filename type: should end with html or pdf")
+
+    driver.quit()
