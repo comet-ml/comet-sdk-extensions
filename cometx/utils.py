@@ -159,3 +159,14 @@ def download_url(url, output_filename, width=None, height=None, timeout=5):
         raise Exception("unknown output_filename type: should end with html or pdf")
 
     driver.quit()
+
+
+def remove_extra_slashes(path):
+    if path:
+        if path.startswith("/"):
+            path = path[1:]
+        if path.endswith("/"):
+            path = path[:-1]
+        return path
+    else:
+        return ""

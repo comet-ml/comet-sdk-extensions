@@ -65,19 +65,14 @@ Where [FLAGS ...] is zero or more of the following:
 import argparse
 import sys
 
-from comet_ml.exceptions import InvalidRestAPIKey
-
-from cometx import DownloadManager
-from cometx.utils import display_invalid_api_key
-
 ADDITIONAL_ARGS = False
 
 
 def get_parser_arguments(parser):
     parser.add_argument(
-        "COMET_PATH",
+        "PATH",
         help=(
-            "The Comet identifier, such as 'WORKSPACE', 'WORKSPACE/PROJECT', or "
+            "The source path, such as 'WORKSPACE', 'WORKSPACE/PROJECT', or "
             + "'WORKSPACE/PROJECT/EXPERIMENT'. Leave empty for all workspaces."
         ),
         nargs="?",
@@ -91,6 +86,13 @@ def get_parser_arguments(parser):
         ),
         nargs="*",
         default=[],
+    )
+    parser.add_argument(
+        "--from",
+        help="Source of data to copy. Should be: comet, wandb, or neptune",
+        default="comet",
+        dest="FROM",
+        metavar="from",
     )
     parser.add_argument(
         "-i", "--ignore", help="Resource(s) to ignore.", nargs="+", default=[]
@@ -168,19 +170,51 @@ def get_parser_arguments(parser):
 
 
 def download(parsed_args, remaining=None):
+    from comet_ml.exceptions import InvalidRestAPIKey
+
+    from ..framework.comet import DownloadManager
+    from ..utils import display_invalid_api_key
+
     try:
         downloader = DownloadManager()
     except ValueError:
         display_invalid_api_key()
         return
 
-    try:
-        downloader.download(
-            comet_path=parsed_args.COMET_PATH,
+    if parsed_args.FROM == "comet":
+        try:
+            downloader.download(
+                comet_path=parsed_args.PATH,
+                include=parsed_args.RESOURCE,
+                ignore=parsed_args.ignore,
+                output=parsed_args.output,
+                use_name=parsed_args.use_name,
+                list_items=parsed_args.list,
+                flat=parsed_args.flat,
+                force=parsed_args.force,
+                filename=parsed_args.filename,
+                asset_type=parsed_args.asset_type,
+                overwrite=parsed_args.overwrite,
+                skip=parsed_args.skip,
+                debug=parsed_args.debug,
+                query=parsed_args.query,
+            )
+        except InvalidRestAPIKey:
+            display_invalid_api_key()
+        except Exception as exc:
+            if parsed_args.debug:
+                raise exc from None
+            else:
+                print("Download aborted: %s" % str(exc))
+        except KeyboardInterrupt:
+            print("User canceled download by keyboard interrupt")
+    elif parsed_args.FROM == "wandb":
+        from ..framework.wandb import DownloadManager
+
+        dm = DownloadManager(
             include=parsed_args.RESOURCE,
             ignore=parsed_args.ignore,
             output=parsed_args.output,
-            use_name=parsed_args.use_name,
             list_items=parsed_args.list,
             flat=parsed_args.flat,
             force=parsed_args.force,
@@ -191,15 +225,7 @@ def download(parsed_args, remaining=None):
             debug=parsed_args.debug,
             query=parsed_args.query,
         )
-    except InvalidRestAPIKey:
-        display_invalid_api_key()
-    except Exception as exc:
-        if parsed_args.debug:
-            raise exc from None
-        else:
-            print("Download aborted: %s" % str(exc))
-    except KeyboardInterrupt:
-        print("User canceled download by keyboard interrupt")
+        dm.download(parsed_args.PATH)
 
 
 def main(args):

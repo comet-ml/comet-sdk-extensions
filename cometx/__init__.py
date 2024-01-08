@@ -18,4 +18,3 @@ os.environ["COMET_LOGGING_CONSOLE"] = "CRITICAL"
 
 from ._version import __version__  # noqa
 from .api import API  # noqa
-from .download_manager import DownloadManager  # noqa

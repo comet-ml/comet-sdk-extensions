@@ -51,6 +51,8 @@ from comet_ml.messages import (
     StandardOutputMessage,
 )
 
+from ..utils import remove_extra_slashes
+
 ADDITIONAL_ARGS = False
 
 
@@ -154,17 +156,6 @@ def copy_experiment_to(experiment_folder, workspace_dst, project_dst):
     log_all(experiment, experiment_folder)
     experiment.end()
     print(f"    New experiment created: {experiment.url}")
-
-
-def remove_extra_slashes(path):
-    if path:
-        if path.startswith("/"):
-            path = path[1:]
-        if path.endswith("/"):
-            path = path[:-1]
-        return path
-    else:
-        return ""
 
 
 def copy_cli(parsed_args):

@@ -18,7 +18,7 @@ import sys
 
 from comet_ml.utils import makedirs
 
-from cometx.download_manager import DownloadManager, clean_comet_path
+from cometx.framework.comet.download_manager import DownloadManager, clean_comet_path
 
 ADDITIONAL_ARGS = False
 
