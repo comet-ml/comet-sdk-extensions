@@ -17,7 +17,7 @@ import sys
 
 from comet_ml.exceptions import InvalidRestAPIKey
 
-from cometx import DownloadManager
+from cometx.framework.comet import DownloadManager
 from cometx.utils import display_invalid_api_key
 
 ADDITIONAL_ARGS = False

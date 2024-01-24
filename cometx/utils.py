@@ -108,7 +108,8 @@ def get_query_experiments(api, query_string, workspace, project_name):
     return api.query(workspace, project_name, query)
 
 
-def download_url(url, output_filename, width=None, height=None, timeout=5):
+def download_url(url, output_filename, width=None, height=None, timeout=5,
+                 headless=False):
     """
     Args:
         url: (str) the URL to download
@@ -126,14 +127,20 @@ def download_url(url, output_filename, width=None, height=None, timeout=5):
         return
 
     options = webdriver.ChromeOptions()
+    if headless:
+        options.add_argument("--headless")
 
     driver = webdriver.Chrome(options=options)
     driver.get(url)
     time.sleep(timeout)
 
-    button = driver.find_element(
-        by="xpath", value='//*[@id="onetrust-reject-all-handler"]'
-    )
+    try:
+        button = driver.find_element(
+            by="xpath", value='//*[@id="onetrust-reject-all-handler"]'
+        )
+    except Exception:
+        button = None
+
     if button:
         button.click()
         time.sleep(2)
@@ -154,6 +161,9 @@ def download_url(url, output_filename, width=None, height=None, timeout=5):
         pdf_bytes = base64.b64decode(pdf)
         with open(output_filename, "wb") as fp:
             fp.write(pdf_bytes)
+
+    elif output_filename.endswith(".png"):
+        driver.save_screenshot(output_filename)
 
     else:
         raise Exception("unknown output_filename type: should end with html or pdf")
