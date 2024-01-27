@@ -14,8 +14,9 @@ import json
 import os
 from urllib.parse import unquote
 
-import wandb
 from comet_ml.utils import makedirs
+
+import wandb
 
 from ..utils import download_url, remove_extra_slashes
 
@@ -71,6 +72,34 @@ class DownloadManager:
 
         for project in projects:
             self.download_reports(workspace, project)
+
+    def download_artifact(
+        self,
+        workspace,
+        project,
+        artifact_name,
+        alias,
+    ):
+        # FIXME: add to main loop
+        """
+        Example:
+
+        ```python
+        download_table(
+            "stacey",
+            "mnist-viz",
+            "baseline",
+            "v4",
+        )
+        """
+        if self.flat:
+            path = self.root
+        else:
+            path = os.path.join(self.root, workspace, project, "artifacts")
+
+        makedirs(path, exist_ok=True)
+        artifact = self.api.artifact(f"{workspace}/{project}/{artifact_name}:{alias}")
+        artifact.download(path)
 
     def download_reports(self, workspace, project):
         if self.flat:
