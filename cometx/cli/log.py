@@ -230,7 +230,7 @@ def log_cli(parsed_args):
                 experiment, parsed_args.FILENAME, parsed_args.type
             )
 
-    if experiment:
+    for experiment in experiments:
         experiment.end()
 
 
