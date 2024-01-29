@@ -22,7 +22,7 @@ from comet_ml.config import get_config
 from comet_ml.utils import proper_registry_model_name
 from mock import patch
 
-from cometx import DownloadManager
+from cometx.framework.comet import DownloadManager
 from cometx.cli.download import main
 
 from ..testlib import environ, until

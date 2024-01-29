@@ -70,14 +70,17 @@ def _input_user_yn(prompt):
 
 def get_file_extension(file_path):
     if file_path is None:
-        return None
+        return ""
 
     ext = os.path.splitext(file_path)[1]
     if not ext:
-        return None
+        return ""
 
     # Get rid of the leading "."
-    return ext[1::]
+    if "." in ext:
+        return ext[1::]
+    else:
+        return ext
 
 
 def display_invalid_api_key(api_key=None, cloud_url=None):

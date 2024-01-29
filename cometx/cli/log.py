@@ -44,6 +44,7 @@ import sys
 from comet_ml import API
 
 from ..utils import get_file_extension, get_query_experiments
+from .utils import log_points_3d_off_file, log_points_3d_pcd_file, log_points_3d_xyz_file
 
 ADDITIONAL_ARGS = False
 # From filename extension to Comet Asset Type
@@ -237,15 +238,22 @@ def log_cli(parsed_args):
 def log_experiment_assets_from_file(experiment, filename, file_type):
     SKELETON = filename
     for filename in glob.glob(SKELETON):
-        if not file_type:
-            extension = get_file_extension(filename)
-            file_type = EXTENSION_MAP.get(extension.lower(), "asset")
+        extension = get_file_extension(filename).lower()
+        if extension == "off":
+            log_points_3d_off_file(experiment, filename)
+        elif extension == "pcd":
+            log_points_3d_pcd_file(experiment, filename)
+        elif extension == "xyz":
+            log_points_3d_xyz_file(experiment, filename)
+        else:
+            if not file_type:
+                file_type = EXTENSION_MAP.get(extension, "asset")
 
-        # metadata = FIXME: get metadata dict from args
-        experiment.log_asset(
-            filename,
-            ftype=file_type,
-        )
+            # metadata = FIXME: get metadata dict from args
+            experiment.log_asset(
+                filename,
+                ftype=file_type,
+            )
 
 
 def log_experiment_code_from_file(experiment, filename):
