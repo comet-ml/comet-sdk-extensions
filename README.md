@@ -172,6 +172,11 @@ cometx list WORKSPACE
 cometx list
 ```
 
+### Flags
+
+* `--query` - use to limit the experiments to download (see [experiment.api.query()](https://www.comet.com/docs/v2/api-and-sdk/python-sdk/reference/API/#apiquery) for more information)
+*  `-u`, `--use-name` - use experiment names for experiment folders and listings
+
 For more information, `cometx list --help`
 
 ## cometx copy
