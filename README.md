@@ -207,6 +207,7 @@ Not all combinations are possible:
 | `WORKSPACE/PROJ/*`   | N/A                  | Copies all experiments |
 | `WORKSPACE/PROJ/EXP` | N/A                  | Copies experiment      |
 
+
 For more information, `cometx copy --help`
 
 ## cometx download
@@ -240,8 +241,9 @@ Where [RESOURCE ...] is zero or more of the following names:
 
 If no RESOURCE is given it will download all of them.
 
-Where [FLAGS ...] is zero or more of the following:
+## Flags
 
+* `--query` - use to limit the experiments to download (see [experiment.api.query()](https://www.comet.com/docs/v2/api-and-sdk/python-sdk/reference/API/#apiquery) for more information)
 * `--list` - use to list available workspaces, projects, experiments,
     artifacts, or models (same as `cometx list`)
 * `--output` - download resources to folder other than current one
@@ -324,6 +326,12 @@ cometx log WORKSPACE/PROJECT PATH-TO-DOWNLOAD --type all
 cometx log WORKSPACE/PROJECT/EXPERIMENT-KEY-OR-NAME PATH-TO-DOWNLOAD --type all
 ```
 The first version will create an experiment, and the second will log everything to an existing experiment.
+
+### Flags
+
+* `--query` - use to limit the experiments to download (see [experiment.api.query()](https://www.comet.com/docs/v2/api-and-sdk/python-sdk/reference/API/#apiquery) for more information)
+* `--type` - the type of item to log
+* `--set` - the "key:value" to log
 
 For more information, `cometx log --help`
 
