@@ -13,8 +13,6 @@
 # ****************************************
 
 from comet_ml import ExistingExperiment
-from comet_ml.experiment_loggers.points_3d.log import log
-from comet_ml.config import DEFAULT_3D_CLOUD_UPLOAD_LIMITS
 
 def adjust_point(xyz):
     x, y, z = xyz
@@ -75,10 +73,14 @@ def log_points_3d_off_file(experiment, filename):
             elif mode == "faces":
                 count += 1
                 line = line.split("#", 1)[0]
-                values = [int(num) for num in line.split()]
-                vs = values[0]
-                segment = values[1:1+vs]
-                color = values[1+vs:]
+                raw_values = line.split()
+                vs = int(raw_values[0])
+                segment = [int(num) for num in raw_values[1:1+vs]]
+                raw_color = raw_values[1+vs:]
+                if any("." in c for c in raw_color):
+                    color = [int(float(num) * 255) for num in raw_color]
+                else:
+                    color = [int(num) for num in raw_color]
                 box = {
                     "segments": [[points[s] for s in segment] + [points[segment[0]]]],
                     "score": 1,
@@ -103,13 +105,10 @@ def log_points_3d_off_file(experiment, filename):
 
     existingExperiment = ExistingExperiment(previous_experiment=experiment.id)
     # log vertices and segments
-    log(
+    existingExperiment.log_points_3d(
         filename,
         points,
         boxes,
-        metadata=None,
         step=0,
-        points_3d_upload_limits=DEFAULT_3D_CLOUD_UPLOAD_LIMITS,
-        summary=existingExperiment._summary,
-        enqueue_message_callback=existingExperiment._enqueue_message,
     )
+    existingExperiment.end()
