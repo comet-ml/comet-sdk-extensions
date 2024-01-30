@@ -44,7 +44,11 @@ import sys
 from comet_ml import API
 
 from ..utils import get_file_extension, get_query_experiments
-from .utils import log_points_3d_off_file, log_points_3d_pcd_file, log_points_3d_xyz_file
+from .utils import (
+    log_points_3d_off_file,
+    log_points_3d_pcd_file,
+    log_points_3d_xyz_file,
+)
 
 ADDITIONAL_ARGS = False
 # From filename extension to Comet Asset Type
@@ -149,7 +153,7 @@ def log_cli(parsed_args):
     api = API()
 
     if experiment_key:
-        experiments = [api.get_experiment_by_key(experiment_key)]
+        experiments = [api.get_experiment(workspace, project_name, experiment_key)]
     elif parsed_args.query is not None:
         experiments = get_query_experiments(
             api, parsed_args.query, workspace, project_name
