@@ -28,11 +28,13 @@ def log_points(filename, experiment, points, boxes):
     # log vertices and segments
     print(f"Logging {filename} to {experiment.get_name()}...")
     existingExperiment.log_points_3d(
-        os.path.basename(filename),
+        os.path.basename(filename) + ".c3d",  # comet 3d file format, zipped jsonl files
         points,
         boxes,
         step=0,
-    )
+    )  # file type is "3d-image" in comet
+    # Log the source data too:
+    existingExperiment.log_asset(filename)
     existingExperiment.end()
 
 
@@ -157,8 +159,8 @@ def log_points_3d_off_file(experiment, filename):
                 line = line.split("#", 1)[0]
                 raw_values = line.split()
                 vs = int(raw_values[0])
-                segment = [int(num) for num in raw_values[1:1 + vs]]
-                raw_color = raw_values[1 + vs:]
+                segment = [int(num) for num in raw_values[1 : 1 + vs]]
+                raw_color = raw_values[1 + vs :]
                 if any("." in c for c in raw_color):
                     color = [int(float(num) * 255) for num in raw_color]
                 else:
