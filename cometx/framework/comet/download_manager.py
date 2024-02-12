@@ -1231,20 +1231,21 @@ class DownloadManager:
                 with open(filepath, "w") as f:
                     f.write(notes)
 
-        project_experiments = self.get_experiments(workspace, project_name, query)
-        if top_level:
-            if self.flat:
-                raise ValueError(
-                    "--flat cannot be used with multiple experiment downloads"
+        if "experiments" not in self.ignore:
+            project_experiments = self.get_experiments(workspace, project_name, query)
+            if top_level:
+                if self.flat:
+                    raise ValueError(
+                        "--flat cannot be used with multiple experiment downloads"
+                    )
+                if not self._confirm_download(len(project_experiments)):
+                    return
+                project_experiments = ProgressBar(
+                    project_experiments, "Downloading experiments"
                 )
-            if not self._confirm_download(len(project_experiments)):
-                return
-            project_experiments = ProgressBar(
-                project_experiments, "Downloading experiments"
-            )
 
-        for experiment in project_experiments:
-            self.download_experiment(experiment, top_level=False)
+            for experiment in project_experiments:
+                self.download_experiment(experiment, top_level=False)
 
     def download_workspace(self, workspace, top_level=True, query=None):
         # type: (str, Optional[bool]) -> None
@@ -1264,7 +1265,7 @@ class DownloadManager:
                     "--flat cannot be used with multiple experiment downloads"
                 )
             total = 0
-            if not self.force:
+            if not self.force and "experiments" not in self.ignore:
                 for project_name in ProgressBar(projects, "Calculating download"):
                     metadata = self.api.get_project(workspace, project_name)
                     total = total + int(metadata["numberOfExperiments"])

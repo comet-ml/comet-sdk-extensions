@@ -54,7 +54,7 @@ Where [FLAGS ...] is zero or more of the following:
 * `--flat` - don't use the normal hiearchy for downloaded items
 * `--use-name` - use experiment names for folders and listings
 * `--ignore` - don't download the following resources (use one or more
-    RESOURCE names from above)
+    RESOURCE names from above, or "experiments" to just get project info)
 * `--asset-type` - asset type to match, or leave off to match all
 * `--filename` - filename to match, or leave off to match all
 * `--overwrite` - overwrite any existing files
@@ -95,7 +95,7 @@ def get_parser_arguments(parser):
         metavar="from",
     )
     parser.add_argument(
-        "-i", "--ignore", help="Resource(s) to ignore.", nargs="+", default=[]
+        "-i", "--ignore", help="Resource(s) (or 'experiments') to ignore.", nargs="+", default=[]
     )
     parser.add_argument(
         "-o",
@@ -170,7 +170,7 @@ def get_parser_arguments(parser):
 
 
 def download(parsed_args, remaining=None):
-    from comet_ml.exceptions import InvalidRestAPIKey
+    from comet_ml.exceptions import InvalidAPIKey
 
     from ..framework.comet import DownloadManager
     from ..utils import display_invalid_api_key
@@ -199,7 +199,7 @@ def download(parsed_args, remaining=None):
                 debug=parsed_args.debug,
                 query=parsed_args.query,
             )
-        except InvalidRestAPIKey:
+        except InvalidAPIKey:
             display_invalid_api_key()
         except Exception as exc:
             if parsed_args.debug:

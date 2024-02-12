@@ -15,7 +15,7 @@
 import argparse
 import sys
 
-from comet_ml.exceptions import InvalidRestAPIKey
+from comet_ml.exceptions import InvalidAPIKey
 
 from cometx.framework.comet import DownloadManager
 from cometx.utils import display_invalid_api_key
@@ -61,7 +61,7 @@ def list(parsed_args, remaining=None):
             list_items=True,
             query=parsed_args.query,
         )
-    except InvalidRestAPIKey:
+    except InvalidAPIKey:
         display_invalid_api_key()
     except Exception as exc:
         print("List aborted: %s" % str(exc))
