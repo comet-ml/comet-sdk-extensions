@@ -18,6 +18,7 @@ Comet.
 import io
 import json
 import logging
+from concurrent.futures import ThreadPoolExecutor
 import os
 import re
 import zipfile
@@ -218,6 +219,7 @@ class DownloadManager:
         skip=False,
         debug=False,
         query=None,
+        max_workers=1,
     ):
         # type: (Optional[str], Optional[List[str]], Optional[List[str]], Optional[str], Optional[bool], Optional[bool], Optional[bool], Optional[bool], Optional[str], Optional[str], Optional[bool], Optional[str]) -> None
         """
@@ -243,6 +245,10 @@ class DownloadManager:
             filename: (str, optional) if given, only download files ending with this
             overwrite: (bool, optional) if given, overwrite files
         """
+        if max_workers > 1:
+            self.queue = ThreadPoolExecutor(max_workers=max_workers)
+        else:
+            self.queue = None
         self.include = set(include if include else self.DEFAULT_RESOURCES[:])
         self.ignore = ignore if ignore else []
         # Remove top-level resources before expanding:
@@ -1078,6 +1084,24 @@ class DownloadManager:
                 with open(filepath, "w") as f:
                     f.write(output)
 
+    def submit_task(self, file_path, experiment, method_name, *args, **kwargs):
+        def task():
+            method = getattr(experiment, method_name)
+            results = method(*args, **kwargs)
+            if results:
+                with open(file_path, "wb+") as f:
+                    f.write(results)
+        if self.queue is None:
+            # Do it now:
+            task()
+        else:
+            # add to queue
+            self.queue.submit(task)
+
+    def end(self):
+        if self.queue is not None:
+            self.queue.shutdown(wait=True)
+
     def download_assets(self, experiment):
         # type: (APIExperiment) -> None
         """
@@ -1105,8 +1129,6 @@ class DownloadManager:
                         f.write(json.dumps(asset))
                         f.write("\n")
 
-        # CN: Consider using a download_asset function here attached to the
-        # download_async method from the file download manager
         filenames = set([])
         for asset in assets:
             asset_type = asset["type"] if asset["type"] else "asset"
@@ -1122,9 +1144,7 @@ class DownloadManager:
                 self.summary["assets"] += 1
                 path, filename = os.path.split(file_path)
                 makedirs(path, exist_ok=True)
-                raw = experiment.get_asset(asset["assetId"])
-                with open(file_path, "wb+") as f:
-                    f.write(raw)
+                self.submit_task(file_path, experiment, "get_asset", [asset["assetId"]])
 
     def download_asset(self, experiment, asset_filename):
         # type: (APIExperiment) -> None

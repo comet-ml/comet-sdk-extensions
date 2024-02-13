@@ -45,6 +45,7 @@ $ cometx download WORKSPACE/model-registry/NAME/VERSION-OR-STAGE [FLAGS ...]
 
 Where [FLAGS ...] is zero or more of the following:
 
+* `--parallel N` - the number of threads to use (default is based on CPUs)
 * `--query` - if given as a Comet query string, only download those
     experiments that match
 * `--skip` - if given, skip previously downloaded experiments
@@ -64,6 +65,7 @@ Where [FLAGS ...] is zero or more of the following:
 
 import argparse
 import sys
+import os
 
 ADDITIONAL_ARGS = False
 
@@ -96,6 +98,9 @@ def get_parser_arguments(parser):
     )
     parser.add_argument(
         "-i", "--ignore", help="Resource(s) (or 'experiments') to ignore.", nargs="+", default=[]
+    )
+    parser.add_argument(
+        "-j", "--parallel", help="The number of threads to use for parallel downloading; default (None) is based on CPUs", type=int, default=None
     )
     parser.add_argument(
         "-o",
@@ -182,6 +187,7 @@ def download(parsed_args, remaining=None):
         return
 
     if parsed_args.FROM == "comet":
+        max_workers = (min(32, os.cpu_count() + 4) if parsed_args.parallel is None else parsed_args.parallel)
         try:
             downloader.download(
                 comet_path=parsed_args.PATH,
@@ -198,7 +204,9 @@ def download(parsed_args, remaining=None):
                 skip=parsed_args.skip,
                 debug=parsed_args.debug,
                 query=parsed_args.query,
+                max_workers=max_workers,
             )
+            downloader.end()
         except InvalidAPIKey:
             display_invalid_api_key()
         except Exception as exc:
