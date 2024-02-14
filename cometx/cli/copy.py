@@ -209,6 +209,9 @@ def copy_cli(parsed_args):
         _, folder_workspace, folder_project, folder_experiment = (
             "/" + experiment_folder
         ).rsplit("/", 3)
+        if folder_experiment in ["project_metadata.json"]:
+            continue
+        
         temp_project_dst = project_dst
         if temp_project_dst is None:
             temp_project_dst = folder_project
