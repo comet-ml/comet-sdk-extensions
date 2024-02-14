@@ -200,6 +200,9 @@ def copy_cli(parsed_args):
             f"{workspace_dst} does not exist; use the Comet UI to create it"
         )
 
+    # For checking if the project_dst exists below:
+    projects = api.get_projects(workspace_dst)
+
     for experiment_folder in get_experiment_folders(
         workspace_src, project_src, experiment_src
     ):
@@ -209,6 +212,21 @@ def copy_cli(parsed_args):
         temp_project_dst = project_dst
         if temp_project_dst is None:
             temp_project_dst = folder_project
+
+        # Next, check if the project_dst exists:
+        if temp_project_dst not in projects:
+            project_metadata_path = os.path.join(workspace_src, project_src, "project_metadata.json")
+            if os.path.exists(project_metadata_path):
+                with open(project_metadata_path) as fp:
+                    project_metadata = json.load(fp)
+                api.create_project(
+                    workspace_dst,
+                    temp_project_dst,
+                    project_description=project_metadata["projectDescription"],
+                    public=project_metadata["public"]
+                )
+            projects.append(temp_project_dst)
+
         if parsed_args.symlink:
             print(
                 f"Creating symlink from {workspace_src}/{project_src}/{experiment_src} to {workspace_dst}/{temp_project_dst}"
