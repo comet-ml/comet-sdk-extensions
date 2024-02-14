@@ -211,14 +211,15 @@ def copy_cli(parsed_args):
         ).rsplit("/", 3)
         if folder_experiment in ["project_metadata.json"]:
             continue
-        
         temp_project_dst = project_dst
         if temp_project_dst is None:
             temp_project_dst = folder_project
 
         # Next, check if the project_dst exists:
         if temp_project_dst not in projects:
-            project_metadata_path = os.path.join(workspace_src, project_src, "project_metadata.json")
+            project_metadata_path = os.path.join(
+                workspace_src, project_src, "project_metadata.json"
+            )
             if os.path.exists(project_metadata_path):
                 with open(project_metadata_path) as fp:
                     project_metadata = json.load(fp)
@@ -226,7 +227,7 @@ def copy_cli(parsed_args):
                     workspace_dst,
                     temp_project_dst,
                     project_description=project_metadata["projectDescription"],
-                    public=project_metadata["public"]
+                    public=project_metadata["public"],
                 )
             projects.append(temp_project_dst)
 
