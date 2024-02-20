@@ -302,10 +302,8 @@ class CopyManager:
             experiment.add_tags(metadata["tags"])
             if metadata["fileName"] == "Jupyter interactive":
                 experiment.set_filename(metadata["fileName"])
-            else:
-                experiment.set_filename(
-                    os.path.join(metadata["filePath"], metadata["fileName"])
-                )
+            elif metadata["fileName"] is not None:
+                experiment.set_filename(os.path.join(metadata["fileName"]))
 
     def log_system_details(self, experiment, filename):
         """
