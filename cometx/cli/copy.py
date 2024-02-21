@@ -102,8 +102,14 @@ def copy(parsed_args, remaining=None):
             parsed_args.symlink,
             parsed_args.ignore,
         )
+        if parsed_args.debug:
+            print("finishing...")
+
     except KeyboardInterrupt:
-        print("Canceled by CONTROL+C")
+        if parsed_args.debug:
+            raise
+        else:
+            print("Canceled by CONTROL+C")
     except Exception as exc:
         if parsed_args.debug:
             raise
@@ -126,6 +132,7 @@ class CopyManager:
     def copy(self, source, destination, symlink, ignore):
         """ """
         self.ignore = ignore
+        self.debug = True
         comet_destination = remove_extra_slashes(destination)
         comet_destination = comet_destination.split("/")
         if len(comet_destination) == 2:
@@ -207,6 +214,8 @@ class CopyManager:
         Create an experiment in destination workspace
         and project, and return a APIExperiment.
         """
+        if self.debug:
+            print("Creating experiment...")
         experiment = Experiment(
             project_name=project_dst,
             workspace=workspace_dst,
@@ -297,6 +306,8 @@ class CopyManager:
          "cometDownloadVersion": "1.2.4"
          }
         """
+        if self.debug:
+            print("log_metadata...")
         if os.path.exists(filename):
             metadata = json.load(open(filename))
             experiment.add_tags(metadata["tags"])
@@ -331,6 +342,8 @@ class CopyManager:
          "totalRam": 13653573632.0
         }
         """
+        if self.debug:
+            print("log_system_details...")
         if os.path.exists(filename):
             system = json.load(open(filename))
 
@@ -356,6 +369,8 @@ class CopyManager:
             experiment._enqueue_message(message)
 
     def log_graph(self, experiment, filename):
+        if self.debug:
+            print("log_graph...")
         if os.path.exists(filename):
             experiment.set_model_graph(open(filename).read())
 
@@ -384,6 +399,8 @@ class CopyManager:
          "experimentKey": "92ecd97e311c41939c7f68ddec98ba67"
         }
         """
+        if self.debug:
+            print("log_assets...")
         for log_filename in assets_metadata:
             asset_type = assets_metadata[log_filename].get("type", None)
             asset_type = asset_type if asset_type else "asset"
@@ -421,6 +438,8 @@ class CopyManager:
 
     def log_code(self, experiment, filename):
         """ """
+        if self.debug:
+            print("log_code...")
         if os.path.exists(filename):
             if os.path.isfile(filename):
                 experiment.log_code(str(filename))
@@ -431,6 +450,8 @@ class CopyManager:
         """
         Requirements (pip packages)
         """
+        if self.debug:
+            print("log_requirements...")
         if os.path.exists(filename):
             installed_packages_list = [package.strip() for package in open(filename)]
             if installed_packages_list is None:
@@ -444,6 +465,8 @@ class CopyManager:
 
     def log_metrics(self, experiment, filename):
         """ """
+        if self.debug:
+            print("log_metrics...")
         if os.path.exists(filename):
             for line in open(filename):
                 dict_line = json.loads(line)
@@ -466,6 +489,8 @@ class CopyManager:
 
     def log_parameters(self, experiment, filename):
         """ """
+        if self.debug:
+            print("log_parameters...")
         if os.path.exists(filename):
             parameters = json.load(open(filename))
             for parameter in parameters:
@@ -475,6 +500,8 @@ class CopyManager:
 
     def log_others(self, experiment, filename):
         """ """
+        if self.debug:
+            print("log_others...")
         if os.path.exists(filename):
             for line in open(filename):
                 dict_line = json.loads(line)
@@ -484,6 +511,8 @@ class CopyManager:
 
     def log_output(self, experiment, output_file):
         """ """
+        if self.debug:
+            print("log_output...")
         if os.path.exists(output_file):
             for line in open(output_file):
                 message = StandardOutputMessage.create(
@@ -495,6 +524,8 @@ class CopyManager:
                 experiment._enqueue_message(message)
 
     def log_html(self, experiment, filename):
+        if self.debug:
+            print("log_html...")
         if os.path.exists(filename):
             html = open(filename).read()
             message = HtmlMessage.create(
