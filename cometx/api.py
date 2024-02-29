@@ -119,3 +119,45 @@ class API(API):
             "write/template/upload", {"teamId": workspace_id}, files={"file": filename}
         )
         return results
+
+    def log_pr_curves(
+        self, experiment, y_true, y_predicted, labels=None, overwrite=False, step=None
+    ):
+        """
+        Log a Precision/Recall curve for each class/column to the given experiment.
+
+        Args:
+            experiment: the experiment to log the curves to
+            y_true: a list of lists of binary truth (where 1 means that column's class is present)
+            y_predicted: a list of list of probabilities of predictions (0 to 1) for each output
+            labels (optional): a list of strings (class names)
+            overwrite (optional): whether to overwrite previously-logged curves
+            step: (optional, by highly encouraged) the step in the training process
+        """
+        try:
+            import numpy as np
+            from sklearn.metrics import precision_recall_curve
+        except ImportError:
+            raise Exception(
+                "Experiment.log_pr_curve() requires numpy and sklearn"
+            ) from None
+
+        y_true = np.array(y_true)
+        y_predicted = np.array(y_predicted)
+
+        if labels is None:
+            labels = [("Class %s" % i) for i in range(len(y_true[0]))]
+
+        results = []
+        for i in range(len(labels)):
+            y, x, _ = precision_recall_curve(y_true[:, i], y_predicted[:, i])
+
+            result = experiment.log_curve(
+                name=labels[i],
+                x=x,
+                y=y,
+                overwrite=overwrite,
+                step=step,
+            )
+            results.append(result)
+        return results
