@@ -30,7 +30,7 @@ import sys
 from cometx import __version__
 
 # Import CLI commands:
-from . import copy, delete_assets, download, list_command, log, reproduce
+from . import config, copy, delete_assets, download, list_command, log, reproduce
 
 
 def add_subparser(subparsers, module, name):
@@ -75,6 +75,7 @@ def main(raw_args=sys.argv[1:]):
     add_subparser(subparsers, delete_assets, "delete-assets")
     add_subparser(subparsers, list_command, "list")
     add_subparser(subparsers, reproduce, "reproduce")
+    add_subparser(subparsers, config, "config")
 
     # First identify the subparser as some subparser pass additional args to
     # the subparser and other not
