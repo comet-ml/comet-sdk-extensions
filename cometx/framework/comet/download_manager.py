@@ -18,15 +18,15 @@ Comet.
 import io
 import json
 import logging
-from concurrent.futures import ThreadPoolExecutor
 import os
 import re
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 
 try:
     from tqdm import tqdm as ProgressBar
 except ImportError:
-    from .utils import ProgressBar
+    from comet_ml.utils import ProgressBar
 
 from comet_ml.api import API, APIExperiment
 from comet_ml.artifacts import _get_artifact
@@ -1091,6 +1091,7 @@ class DownloadManager:
             if results:
                 with open(file_path, "wb+") as f:
                     f.write(results)
+
         if self.queue is None:
             # Do it now:
             task()
