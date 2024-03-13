@@ -26,7 +26,7 @@ from concurrent.futures import ThreadPoolExecutor
 try:
     from tqdm import tqdm as ProgressBar
 except ImportError:
-    from comet_ml.utils import ProgressBar
+    from cometx.utils import ProgressBar
 
 from comet_ml.api import API, APIExperiment
 from comet_ml.artifacts import _get_artifact
