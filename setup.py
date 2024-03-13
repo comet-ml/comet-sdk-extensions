@@ -50,6 +50,7 @@ setup_args = dict(
         "cometx.cli",
         "cometx.tools",
         "cometx.framework",
+        "cometx.framework.comet",
         "cometx",
     ],
     entry_points={"console_scripts": ["cometx = cometx.cli:main"]},
