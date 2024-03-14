@@ -11,9 +11,14 @@
 # ****************************************
 
 import json
+import math
 import os
+import shutil
+import tempfile
 from urllib.parse import unquote
 
+from comet_ml.cli_args_parse import _parse_cmd_args, _parse_cmd_args_naive
+from comet_ml.connection import compress_git_patch
 from comet_ml.utils import makedirs
 
 import wandb
@@ -47,31 +52,258 @@ class DownloadManager:
         self.filename = filename
         self.asset_type = asset_type
         self.overwrite = overwrite
+        self.ignore = ignore
+        self.include_experiments = None
 
     def download(self, PATH):
         path = remove_extra_slashes(PATH)
         path_parts = path.split("/")
-        if len(path_parts) == 3:
-            workspace, project, experiment = path_parts
-        elif len(path_parts) == 2:
+        if len(path_parts) == 2:
             workspace, project = path_parts
-            experiment = None
-        elif len(path_parts) == 1:
-            workspace = path_parts[0]
-            project = None
-            experiment = None
+            self.include_experiments = None
+        elif len(path_parts) == 3:
+            workspace, project, experiment = path_parts
+            self.include_experiments = [experiment]
         else:
             raise Exception("invalid PATH: %r" % PATH)
 
-        if project is None:
-            projects = self.api.projects(workspace + "/" + project)
-        else:
-            projects = [project]
+        projects = [project]
 
         # Download items:
-
         for project in projects:
-            self.download_reports(workspace, project)
+            if "reports" not in self.ignore:
+                self.download_reports(workspace, project)
+            self.download_runs(workspace, project)
+
+    def get_path(self, run, *subdirs, filename=None):
+        if self.flat:
+            path = self.root
+        else:
+            workspace, project, experiment = run.path
+            path = os.path.join(self.root, workspace, project, experiment, *subdirs)
+        makedirs(path, exist_ok=True)
+        if filename:
+            path = os.path.join(path, filename)
+        return path
+
+    def get_file_path(self, wandb_file):
+        return "/".join(wandb_file.name.split("/")[:-1])
+
+    def get_file_name(self, wandb_file):
+        return wandb_file.name.split("/")[-1]
+
+    def download_parameters(self, run, args):
+        print("    downloading parameters...")
+        try:
+            args = _parse_cmd_args(args)
+        except ValueError:
+            args = _parse_cmd_args_naive(args)
+
+        if args:
+            parameters = []
+            for key, value in args.items():
+                parameters.append(
+                    {
+                        "name": key,
+                        "valueMax": value,
+                        "valueMin": value,
+                        "valueCurrent": value,
+                        "editable": false,
+                    }
+                )
+            if parameters:
+                path = self.get_path(run, filename="parameters.json")
+                with open(filename, "w") as fp:
+                    fp.write(json.dumps(parameters) + "\n")
+
+    def download_file(self, path, file):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            file.download(root=tmpdir)
+            shutil.copy(os.path.join(tmpdir, file.name), path)
+
+    def download_model_graph(self, run, file):
+        print("    downloading model graph...")
+        path = self.get_path(run, "run", filename="graph_definition.txt")
+        self.download_file(path, file)
+
+    def download_model(self, run, file):
+        print("    downloading model...")
+        self.download_asset(path, file)
+
+    def download_image(self, run, file):
+        print("    downloading image...")
+        filename = self.get_file_name(file)
+        path = self.get_path(run, "assets", "image", filename=filename)
+        self.download_file(path, file)
+
+    def download_asset(self, run, file):
+        print("    downloading asset...")
+        filename = self.get_file_name(file)
+        path = self.get_path(run, "assets", "asset", filename=filename)
+        self.download_file(path, file)
+
+    def download_code(self, run, file):
+        print("    downloading code...")
+        path = self.get_path(run, "run", filename="script.py")
+        self.download_file(path, file)
+
+    def download_output(self, run, file):
+        print("    downloading output...")
+        path = self.get_path(run, "run", filename="output.txt")
+        self.download_file(path, file)
+
+    def download_dependencies(self, run, file):
+        print("    downloading dependencies...")
+        path = self.get_path(run, "run", filename="requirements.txt")
+        self.download_file(path, file)
+
+    def download_others(self, run, data):
+        print("    downloading others...")
+        filename = self.get_path(run, filename="others.jsonl")
+        with open(filename, "w") as fp:
+            for key, value in data.items():
+                fp.write(
+                    f'{{"name": "{key}", "valueMax": "{value}", "valueMin": "{value}", "valueCurrent": "{value}", "editable": false}}\n'
+                )
+
+    def download_runs(self, workspace, project):
+        runs = self.api.runs(f"{workspace}/{project}")
+        for run in reversed(runs):
+            # Handle all of the basic run items here:
+            _, _, experiment = run.path
+            if not (
+                self.include_experiments is None
+                or experiment in self.include_experiments
+            ):
+                continue
+            print(
+                f"downloading run {run.name} to {workspace}/{project}/{experiment}..."
+            )
+            others = {
+                "Name": run.name,
+                "origin": run.url,
+            }
+            if "-run-" in run.name:
+                group, count = run.name.rsplit("-run-", 1)
+                others["sweep-group"] = group
+                others["sweep-run"] = "run-" + count
+            self.download_others(run, others)
+            # Handle all of the specific run items below:
+            if "metrics" not in self.ignore:
+                self.download_metrics(run)
+
+            # Handle assets (things that have a filename) here:
+            for file in list(run.files()):
+                path = self.get_file_path(file)
+                name = file.name
+                if path == "media/graph" and "graph" not in self.ignore:
+                    self.download_model_graph(run, file)
+                elif path == "code" and "code" not in self.ignore:
+                    self.download_code(run, file)
+                elif name == "output.log" and "output" not in self.ignore:
+                    self.download_output(run, file)
+                elif name == "requirements.txt":
+                    self.download_dependencies(run, file)
+                elif name == "wandb-summary.json":
+                    # FIXME
+                    with tempfile.TemporaryDirectory() as tmpdirname:
+                        summary = json.load(file.download(root=tmpdirname))
+                    # do anything with min/max/avg of each metric?
+                    # interesting keys:
+                    # throughput/device/batches_per_second
+                    # throughput/total_tokens
+                    # _timestamp
+                elif name == "wandb-metadata.json":
+                    ## System info:
+                    with tempfile.TemporaryDirectory() as tmpdirname:
+                        system_and_os_info = json.load(file.download(root=tmpdirname))
+                    message = SystemDetailsMessage(
+                        context=self.experiment.context,
+                        use_http_messages=self.experiment.streamer.use_http_messages,
+                        command=[system_and_os_info["program"]]
+                        + system_and_os_info["args"]
+                        if system_and_os_info["args"]
+                        else [system_and_os_info["program"]],
+                        env=None,
+                        hostname=system_and_os_info["host"],
+                        ip="",
+                        machine="",
+                        os_release=system_and_os_info["os"],
+                        os_type=system_and_os_info["os"],
+                        os=system2_and_os_info["os"],
+                        pid=0,
+                        processor="",
+                        python_exe=system_and_os_info["executable"],
+                        python_version_verbose=system_and_os_info["python"],
+                        python_version=system_and_os_info["python"],
+                        user=system_and_os_info["username"],
+                    )
+                    self.experiment._enqueue_message(message)
+                    # Set the filename separately
+                    ## self.experiment.set_filename(system_and_os_info['program'])
+                    # Set the args separately
+                    self.download_parameters(system_and_os_info["args"])
+                    # Set git separately:
+                    """
+                    if "git" in system_and_os_info:
+                        commit = system_and_os_info["git"]["commit"]
+                        origin = remote = system_and_os_info["git"]["remote"]
+                        if remote.endswith(".git"):
+                            remote = remote[:-4]
+                        git_metadata = {
+                            "parent": commit,
+                            "repo_name": remote,
+                            "status": None,
+                            "user": None,
+                            "root": None,
+                            "branch": None,
+                            "origin": origin,
+                        }
+                        #message = GitMetadataMessage.create(
+                        #    context=self.experiment.context,
+                        #    use_http_messages=self.experiment.streamer.use_http_messages,
+                        #    git_metadata=git_metadata,
+                        #)
+                        #self.experiment._enqueue_message(message)
+                    # Log the entire file as well:
+                    #self.experiment._log_asset(
+                    #    f"{tmpdirname}/wandb-metadata.json",
+                    #    asset_type='wandb-metadata' # TODO: backend changes unknown asset type to "others"
+                    #)
+                elif name == "diff.patch":
+                    git_patch = file.download(root=tmpdirname).read()
+                    _, zip_path = compress_git_patch(git_patch)
+                    processor = GitPatchUploadProcessor(
+                        TemporaryFilePath(zip_path),
+                        self.experiment.asset_upload_limit,
+                        url_params=None,
+                        metadata=None,
+                        copy_to_tmp=False,
+                        error_message_identifier=None,
+                        tmp_dir=self.experiment.tmpdir,
+                        critical=False,
+                    )
+                    upload_message = processor.process()
+                    if upload_message:
+                        self.experiment._enqueue_message(upload_message)
+                    """
+                elif "media/images" in path:
+                    self.download_image(run, file)
+                elif any(
+                    extension in name
+                    for extension in [
+                        ".pb",
+                        ".onnx",
+                        ".pkl",
+                        ".mlmodel",
+                        ".pmml",
+                        ".pt",
+                        ".h5",
+                    ]
+                ):
+                    self.download_model(run, file)
+                else:
+                    self.download_asset(run, file)
 
     def download_artifact(
         self,
@@ -91,6 +323,7 @@ class DownloadManager:
             "baseline",
             "v4",
         )
+        ```
         """
         if self.flat:
             path = self.root
@@ -100,6 +333,36 @@ class DownloadManager:
         makedirs(path, exist_ok=True)
         artifact = self.api.artifact(f"{workspace}/{project}/{artifact_name}:{alias}")
         artifact.download(path)
+
+    def download_metrics(self, run):
+        # FIXME: these can be items other than metrics
+        pandas_df_plots = run.history()
+        # FIXME: if pandas is not installed, what can be in this list?
+        if isinstance(pandas_df_plots, list):
+            metrics = []
+        else:
+            metrics = [
+                col
+                for col in pandas_df_plots.columns
+                if (not col.startswith("_") and not col == "examples")
+            ]
+        filename = self.get_path(run, "metrics.jsonl")
+        with open(filename, "w") as fp:
+            for metric in metrics:
+                steps = pandas_df_plots["_step"]
+                timestamps = (
+                    pandas_df_plots["_timestamp"]
+                    if "_timestamp" in pandas_df_plots
+                    else [None] * len(steps)
+                )
+                values = pandas_df_plots[metric]
+                for value, step, timestamp in zip(values, steps, timestamps):
+                    if value is not None and not math.isnan(value):
+                        ts = int(timestamp * 1000) if timestamp is not None else None
+                        if metric and value:
+                            fp.write(
+                                f'{{"metricName": "{metric}", "metricValue": "{value}", "timestamp": {ts}, "step": {step}, "epoch": null, "runContext": null}}\n'
+                            )
 
     def download_reports(self, workspace, project):
         if self.flat:

@@ -43,7 +43,7 @@ import json
 import os
 import sys
 
-from comet_ml import API, APIExperiment, Experiment
+from comet_ml import API, APIExperiment, OfflineExperiment
 from comet_ml._typing import TemporaryFilePath
 from comet_ml.connection import compress_git_patch
 from comet_ml.file_uploader import GitPatchUploadProcessor
@@ -212,11 +212,11 @@ class CopyManager:
     def create_experiment(self, workspace_dst, project_dst):
         """
         Create an experiment in destination workspace
-        and project, and return a APIExperiment.
+        and project, and return an Experiment.
         """
         if self.debug:
             print("Creating experiment...")
-        experiment = Experiment(
+        experiment = OfflineExperiment(
             project_name=project_dst,
             workspace=workspace_dst,
             log_code=False,
@@ -279,7 +279,12 @@ class CopyManager:
         # copy all resources to existing or new experiment
         self.log_all(experiment, experiment_folder)
         experiment.end()
-        print(f"    New experiment created: {experiment.url}")
+        print(
+            f"Uploading {experiment.offline_directory}/{experiment._get_offline_archive_file_name()}"
+        )
+        os.system(
+            f"comet upload {experiment.offline_directory}/{experiment._get_offline_archive_file_name()}"
+        )
 
     def log_metadata(self, experiment, filename):
         """
@@ -479,9 +484,8 @@ class CopyManager:
                 context = dict_line["runContext"]
                 timestamp = dict_line["timestamp"]
                 # FIXME: does not log time, duration
-                message = MetricMessage.create(
+                message = MetricMessage(
                     context=context,
-                    use_http_messages=experiment.streamer.use_http_messages,
                     timestamp=timestamp,
                 )
                 message.set_metric(name, value, step=step, epoch=epoch)
