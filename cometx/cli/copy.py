@@ -43,7 +43,7 @@ import json
 import os
 import sys
 
-from comet_ml import API, APIExperiment, OfflineExperiment
+from comet_ml import API, APIExperiment, Artifact, Experiment, OfflineExperiment
 from comet_ml._typing import TemporaryFilePath
 from comet_ml.connection import compress_git_patch
 from comet_ml.file_uploader import GitPatchUploadProcessor
@@ -133,6 +133,7 @@ class CopyManager:
         """ """
         self.ignore = ignore
         self.debug = True
+        self.copied_reports = False
         comet_destination = remove_extra_slashes(destination)
         comet_destination = comet_destination.split("/")
         if len(comet_destination) == 2:
@@ -209,14 +210,16 @@ class CopyManager:
                     experiment_folder, workspace_dst, temp_project_dst
                 )
 
-    def create_experiment(self, workspace_dst, project_dst):
+    def create_experiment(self, workspace_dst, project_dst, offline=True):
         """
         Create an experiment in destination workspace
         and project, and return an Experiment.
         """
         if self.debug:
             print("Creating experiment...")
-        experiment = OfflineExperiment(
+
+        ExperimentClass = OfflineExperiment if offline else Experiment
+        experiment = ExperimentClass(
             project_name=project_dst,
             workspace=workspace_dst,
             log_code=False,
@@ -273,8 +276,31 @@ class CopyManager:
                         break
                     line = fp.readline()
         print(f"Copying from {title} to {workspace_dst}/{project_dst}...")
+
+        # Copy other project-level items to an experiment:
+        if "reports" not in self.ignore and not self.copied_reports:
+            experiment = None
+            workspace_src, project_src, _ = experiment_folder.split("/")
+            reports = os.path.join(workspace_src, project_src, "reports", "*")
+            for filename in glob.glob(reports):
+                if filename.endswith("reports_metadata.jsonl"):
+                    continue
+                basename = os.path.basename(filename)
+                artifact = Artifact(basename, "Report")
+                artifact.add(filename)
+                if experiment is None:
+                    experiment = self.create_experiment(
+                        workspace_dst, project_dst, offline=False
+                    )
+                    experiment.log_other("Name", "Reports")
+                experiment.log_artifact(artifact)
+            if experiment:
+                experiment.end()
+            self.copied_reports = True
+
         # if project doesn't exist, create it
         experiment = self.create_experiment(workspace_dst, project_dst)
+
         # copy experiment_folder stuff to experiment
         # copy all resources to existing or new experiment
         self.log_all(experiment, experiment_folder)

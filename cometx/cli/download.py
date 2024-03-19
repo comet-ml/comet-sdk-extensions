@@ -64,8 +64,8 @@ Where [FLAGS ...] is zero or more of the following:
 """
 
 import argparse
-import sys
 import os
+import sys
 
 ADDITIONAL_ARGS = False
 
@@ -97,10 +97,24 @@ def get_parser_arguments(parser):
         metavar="from",
     )
     parser.add_argument(
-        "-i", "--ignore", help="Resource(s) (or 'experiments') to ignore.", nargs="+", default=[]
+        "-i",
+        "--ignore",
+        help="Resource(s) (or 'experiments') to ignore.",
+        nargs="+",
+        default=[],
     )
     parser.add_argument(
-        "-j", "--parallel", help="The number of threads to use for parallel downloading; default (None) is based on CPUs", type=int, default=None
+        "--update",
+        help="Whether to update or replace (if --force)",
+        action="store_true",
+        default=False,
+    )
+    parser.add_argument(
+        "-j",
+        "--parallel",
+        help="The number of threads to use for parallel downloading; default (None) is based on CPUs",
+        type=int,
+        default=None,
     )
     parser.add_argument(
         "-o",
@@ -187,7 +201,11 @@ def download(parsed_args, remaining=None):
         return
 
     if parsed_args.FROM == "comet":
-        max_workers = (min(32, os.cpu_count() + 4) if parsed_args.parallel is None else parsed_args.parallel)
+        max_workers = (
+            min(32, os.cpu_count() + 4)
+            if parsed_args.parallel is None
+            else parsed_args.parallel
+        )
         try:
             downloader.download(
                 comet_path=parsed_args.PATH,
@@ -205,6 +223,7 @@ def download(parsed_args, remaining=None):
                 debug=parsed_args.debug,
                 query=parsed_args.query,
                 max_workers=max_workers,
+                update=parsed_args.update,
             )
             downloader.end()
         except InvalidAPIKey:
@@ -232,6 +251,7 @@ def download(parsed_args, remaining=None):
             skip=parsed_args.skip,
             debug=parsed_args.debug,
             query=parsed_args.query,
+            update=parsed_args.update,
         )
         dm.download(parsed_args.PATH)
 

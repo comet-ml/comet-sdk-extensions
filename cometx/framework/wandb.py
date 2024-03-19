@@ -13,6 +13,7 @@
 import json
 import math
 import os
+import re
 import shutil
 import tempfile
 from urllib.parse import unquote
@@ -41,8 +42,9 @@ class DownloadManager:
         skip=False,
         debug=False,
         query=None,
+        update=False,
     ):
-        self.api = wandb.Api()
+        self.api = wandb.Api(timeout=60)
 
         self.root = output if output is not None else os.getcwd()
         self.debug = debug
@@ -54,6 +56,8 @@ class DownloadManager:
         self.overwrite = overwrite
         self.ignore = ignore
         self.include_experiments = None
+        self.asset_metadata = []
+        self.update = update
 
     def download(self, PATH):
         path = remove_extra_slashes(PATH)
@@ -71,8 +75,9 @@ class DownloadManager:
 
         # Download items:
         for project in projects:
-            if "reports" not in self.ignore:
-                self.download_reports(workspace, project)
+            # FIXME: PDF only show first exposed charts; ignore for now
+            # if "reports" not in self.ignore:
+            #    self.download_reports(workspace, project)
             self.download_runs(workspace, project)
 
     def get_path(self, run, *subdirs, filename=None):
@@ -84,6 +89,18 @@ class DownloadManager:
         makedirs(path, exist_ok=True)
         if filename:
             path = os.path.join(path, filename)
+            # Add to asset metadata:
+            if (
+                len(subdirs) > 1
+                and subdirs[0] == "assets"
+                and subdirs[1] != "assets_metadata.jsonl"
+            ):
+                self.asset_metadata.append(
+                    {
+                        "fileName": filename,
+                        "type": subdirs[1],
+                    }
+                )
         return path
 
     def get_file_path(self, wandb_file):
@@ -108,18 +125,23 @@ class DownloadManager:
                         "valueMax": value,
                         "valueMin": value,
                         "valueCurrent": value,
-                        "editable": false,
+                        "editable": False,
                     }
                 )
             if parameters:
                 path = self.get_path(run, filename="parameters.json")
-                with open(filename, "w") as fp:
+                # FIXME: change "w" to "a+" if self.update
+                with open(path, "w") as fp:
                     fp.write(json.dumps(parameters) + "\n")
 
     def download_file(self, path, file):
         with tempfile.TemporaryDirectory() as tmpdir:
             file.download(root=tmpdir)
             shutil.copy(os.path.join(tmpdir, file.name), path)
+
+    def download_data(self, path, data):
+        with open(path, "w") as fp:
+            fp.write(data + "\n")
 
     def download_model_graph(self, run, file):
         print("    downloading model graph...")
@@ -128,6 +150,8 @@ class DownloadManager:
 
     def download_model(self, run, file):
         print("    downloading model...")
+        filename = self.get_file_name(file)
+        path = self.get_path(run, "assets", "model", filename=filename)
         self.download_asset(path, file)
 
     def download_image(self, run, file):
@@ -141,6 +165,10 @@ class DownloadManager:
         filename = self.get_file_name(file)
         path = self.get_path(run, "assets", "asset", filename=filename)
         self.download_file(path, file)
+
+    def download_asset_data(self, run, data, filename):
+        path = self.get_path(run, "assets", "asset", filename=filename)
+        self.download_data(path, data)
 
     def download_code(self, run, file):
         print("    downloading code...")
@@ -157,37 +185,61 @@ class DownloadManager:
         path = self.get_path(run, "run", filename="requirements.txt")
         self.download_file(path, file)
 
+    def download_asset_metadata(self, run):
+        path = self.get_path(run, "assets", filename="assets_metadata.jsonl")
+        with open(path, "w") as fp:
+            for metadata in self.asset_metadata:
+                fp.write(json.dumps(metadata) + "\n")
+
     def download_others(self, run, data):
         print("    downloading others...")
         filename = self.get_path(run, filename="others.jsonl")
         with open(filename, "w") as fp:
             for key, value in data.items():
-                fp.write(
-                    f'{{"name": "{key}", "valueMax": "{value}", "valueMin": "{value}", "valueCurrent": "{value}", "editable": false}}\n'
-                )
+                data_json = {
+                    "name": key,
+                    "valueMax": str(value),
+                    "valueMin": str(value),
+                    "valueCurrent": str(value),
+                    "editable": False,
+                }
+                fp.write(json.dumps(data_json) + "\n")
 
     def download_runs(self, workspace, project):
         runs = self.api.runs(f"{workspace}/{project}")
         for run in reversed(runs):
             # Handle all of the basic run items here:
             _, _, experiment = run.path
+            # Skip if experiment is not one to download:
             if not (
                 self.include_experiments is None
                 or experiment in self.include_experiments
             ):
                 continue
+
+            # Skip if already downloaded, and not force:
+            if (
+                os.path.exists(os.path.join(workspace, project, experiment))
+                and not self.force
+            ):
+                print(f"skipping {workspace}/{project}/{experiment}...")
+                continue
+
             print(
                 f"downloading run {run.name} to {workspace}/{project}/{experiment}..."
             )
+            self.asset_metadata = []
             others = {
                 "Name": run.name,
                 "origin": run.url,
             }
             if "-run-" in run.name:
                 group, count = run.name.rsplit("-run-", 1)
-                others["sweep-group"] = group
-                others["sweep-run"] = "run-" + count
-            self.download_others(run, others)
+                others["Group"] = group
+                others["Run"] = "run-" + count
+            else:
+                others["Group"] = run.name
+                others["Run"] = run.name
             # Handle all of the specific run items below:
             if "metrics" not in self.ignore:
                 self.download_metrics(run)
@@ -205,18 +257,18 @@ class DownloadManager:
                 elif name == "requirements.txt":
                     self.download_dependencies(run, file)
                 elif name == "wandb-summary.json":
-                    # FIXME
                     with tempfile.TemporaryDirectory() as tmpdirname:
                         summary = json.load(file.download(root=tmpdirname))
-                    # do anything with min/max/avg of each metric?
-                    # interesting keys:
-                    # throughput/device/batches_per_second
-                    # throughput/total_tokens
-                    # _timestamp
+                        # do something with JSON data here if you wish
+                        self.download_asset_data(
+                            run, json.dumps(summary), "wandb_summary.json"
+                        )
                 elif name == "wandb-metadata.json":
                     ## System info:
                     with tempfile.TemporaryDirectory() as tmpdirname:
                         system_and_os_info = json.load(file.download(root=tmpdirname))
+                    # FIXME
+                    """
                     message = SystemDetailsMessage(
                         context=self.experiment.context,
                         use_http_messages=self.experiment.streamer.use_http_messages,
@@ -244,7 +296,6 @@ class DownloadManager:
                     # Set the args separately
                     self.download_parameters(system_and_os_info["args"])
                     # Set git separately:
-                    """
                     if "git" in system_and_os_info:
                         commit = system_and_os_info["git"]["commit"]
                         origin = remote = system_and_os_info["git"]["remote"]
@@ -305,6 +356,10 @@ class DownloadManager:
                 else:
                     self.download_asset(run, file)
 
+            # After all of the file downloads, log others:
+            self.download_others(run, others)
+            self.download_asset_metadata(run)
+
     def download_artifact(
         self,
         workspace,
@@ -334,35 +389,52 @@ class DownloadManager:
         artifact = self.api.artifact(f"{workspace}/{project}/{artifact_name}:{alias}")
         artifact.download(path)
 
+    def ignore_metric_name(self, metric):
+        """
+        Example:
+
+        cometx download --from wandb ... --ignore "metrics:.*/avg"
+        """
+        if metric.startswith("_"):
+            return True
+        # Ignore any matches:
+        for ignore in self.ignore:
+            if ignore.startswith("metrics:"):
+                _, regex = ignore.split(":", 1)
+                if re.match(regex, metric):
+                    return True
+        return False
+
     def download_metrics(self, run):
-        # FIXME: these can be items other than metrics
-        pandas_df_plots = run.history()
-        # FIXME: if pandas is not installed, what can be in this list?
-        if isinstance(pandas_df_plots, list):
-            metrics = []
-        else:
-            metrics = [
-                col
-                for col in pandas_df_plots.columns
-                if (not col.startswith("_") and not col == "examples")
-            ]
-        filename = self.get_path(run, "metrics.jsonl")
+        print("    downloading metrics...")
+        filename = self.get_path(run, filename="metrics.jsonl")
         with open(filename, "w") as fp:
+            metrics = list(run.history(pandas=False, samples=1)[0].keys())
             for metric in metrics:
-                steps = pandas_df_plots["_step"]
-                timestamps = (
-                    pandas_df_plots["_timestamp"]
-                    if "_timestamp" in pandas_df_plots
-                    else [None] * len(steps)
+                if self.ignore_metric_name(metric):
+                    continue
+                metric_data = run.history(
+                    keys=[metric, "_timestamp"], pandas=False, samples=50_000
                 )
-                values = pandas_df_plots[metric]
-                for value, step, timestamp in zip(values, steps, timestamps):
-                    if value is not None and not math.isnan(value):
+                for row in metric_data:
+                    step = row.get("_step", None)
+                    timestamp = row.get("_timestamp", None)
+                    value = row.get(metric, None)
+                    if (
+                        metric is not None
+                        and value is not None
+                        and not math.isnan(value)
+                    ):
                         ts = int(timestamp * 1000) if timestamp is not None else None
-                        if metric and value:
-                            fp.write(
-                                f'{{"metricName": "{metric}", "metricValue": "{value}", "timestamp": {ts}, "step": {step}, "epoch": null, "runContext": null}}\n'
-                            )
+                        data = {
+                            "metricName": metric,
+                            "metricValue": value,
+                            "timestamp": ts,
+                            "step": step,
+                            "epoch": None,
+                            "runContext": None,
+                        }
+                        fp.write(json.dumps(data) + "\n")
 
     def download_reports(self, workspace, project):
         if self.flat:
