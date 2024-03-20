@@ -26,6 +26,8 @@ import wandb
 
 from ..utils import download_url, remove_extra_slashes
 
+MAX_METRIC_SAMPLES = 15_000
+
 
 class DownloadManager:
     def __init__(
@@ -414,7 +416,9 @@ class DownloadManager:
                 if self.ignore_metric_name(metric):
                     continue
                 metric_data = run.history(
-                    keys=[metric, "_timestamp"], pandas=False, samples=50_000
+                    keys=[metric, "_timestamp"],
+                    pandas=False,
+                    samples=MAX_METRIC_SAMPLES,
                 )
                 for row in metric_data:
                     step = row.get("_step", None)
