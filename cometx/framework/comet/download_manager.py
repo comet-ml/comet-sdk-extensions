@@ -220,7 +220,6 @@ class DownloadManager:
         debug=False,
         query=None,
         max_workers=1,
-        update=False,
     ):
         # type: (Optional[str], Optional[List[str]], Optional[List[str]], Optional[str], Optional[bool], Optional[bool], Optional[bool], Optional[bool], Optional[str], Optional[str], Optional[bool], Optional[str]) -> None
         """
@@ -245,7 +244,6 @@ class DownloadManager:
             asset_type:  (str, optional) if given, only match assets with this type
             filename: (str, optional) if given, only download files ending with this
             overwrite: (bool, optional) if given, overwrite files
-            update: (bool, optional) if True, update rather than overwrite (if --overwrite)
         """
         if max_workers > 1:
             self.queue = ThreadPoolExecutor(max_workers=max_workers)
@@ -253,7 +251,6 @@ class DownloadManager:
             self.queue = None
         self.include = set(include if include else self.DEFAULT_RESOURCES[:])
         self.ignore = ignore if ignore else []
-        self.update = update
         # Remove top-level resources before expanding:
         for resource in self.ignore:
             if resource in self.include:

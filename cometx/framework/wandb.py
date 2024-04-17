@@ -44,7 +44,6 @@ class DownloadManager:
         skip=False,
         debug=False,
         query=None,
-        update=False,
     ):
         self.api = wandb.Api(timeout=60)
 
@@ -56,10 +55,12 @@ class DownloadManager:
         self.filename = filename
         self.asset_type = asset_type
         self.overwrite = overwrite
-        self.ignore = ignore
+        self.ignore = ignore if ignore else []
         self.include_experiments = None
+
+    def reset_run(self):
         self.asset_metadata = []
-        self.update = update
+        self.parameters = []
 
     def download(self, PATH):
         path = remove_extra_slashes(PATH)
@@ -69,6 +70,9 @@ class DownloadManager:
             self.include_experiments = None
         elif len(path_parts) == 3:
             workspace, project, experiment = path_parts
+            self.include_experiments = [experiment]
+        elif len(path_parts) == 4 and path_parts[2] == "runs":
+            workspace, project, _, experiment = path_parts
             self.include_experiments = [experiment]
         else:
             raise Exception("invalid PATH: %r" % PATH)
@@ -111,7 +115,7 @@ class DownloadManager:
     def get_file_name(self, wandb_file):
         return wandb_file.name.split("/")[-1]
 
-    def download_parameters(self, run, args):
+    def download_cmd_parameters(self, run, args):
         print("    downloading parameters...")
         try:
             args = _parse_cmd_args(args)
@@ -119,9 +123,9 @@ class DownloadManager:
             args = _parse_cmd_args_naive(args)
 
         if args:
-            parameters = []
+            self.parameters = []
             for key, value in args.items():
-                parameters.append(
+                self.parameters.append(
                     {
                         "name": key,
                         "valueMax": value,
@@ -130,11 +134,6 @@ class DownloadManager:
                         "editable": False,
                     }
                 )
-            if parameters:
-                path = self.get_path(run, filename="parameters.json")
-                # FIXME: change "w" to "a+" if self.update
-                with open(path, "w") as fp:
-                    fp.write(json.dumps(parameters) + "\n")
 
     def download_file(self, path, file):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -230,7 +229,7 @@ class DownloadManager:
             print(
                 f"downloading run {run.name} to {workspace}/{project}/{experiment}..."
             )
-            self.asset_metadata = []
+            self.reset_run()
             others = {
                 "Name": run.name,
                 "origin": run.url,
@@ -250,7 +249,10 @@ class DownloadManager:
             for file in list(run.files()):
                 path = self.get_file_path(file)
                 name = file.name
-                if path == "media/graph" and "graph" not in self.ignore:
+                if name.startswith("artifact/"):
+                    self.download_artifact(run, file)
+
+                elif path == "media/graph" and "graph" not in self.ignore:
                     self.download_model_graph(run, file)
                 elif path == "code" and "code" not in self.ignore:
                     self.download_code(run, file)
@@ -261,71 +263,21 @@ class DownloadManager:
                 elif name == "wandb-summary.json":
                     with tempfile.TemporaryDirectory() as tmpdirname:
                         summary = json.load(file.download(root=tmpdirname))
-                        # do something with JSON data here if you wish
+                        # list of all of the metrics
                         self.download_asset_data(
                             run, json.dumps(summary), "wandb_summary.json"
                         )
                 elif name == "wandb-metadata.json":
-                    ## System info:
-                    with tempfile.TemporaryDirectory() as tmpdirname:
-                        system_and_os_info = json.load(file.download(root=tmpdirname))
+                    ## System info etc
+                    self.download_system_details(run, file)
+                elif name == "diff.patch":
                     # FIXME
                     """
-                    message = SystemDetailsMessage(
-                        context=self.experiment.context,
-                        use_http_messages=self.experiment.streamer.use_http_messages,
-                        command=[system_and_os_info["program"]]
-                        + system_and_os_info["args"]
-                        if system_and_os_info["args"]
-                        else [system_and_os_info["program"]],
-                        env=None,
-                        hostname=system_and_os_info["host"],
-                        ip="",
-                        machine="",
-                        os_release=system_and_os_info["os"],
-                        os_type=system_and_os_info["os"],
-                        os=system2_and_os_info["os"],
-                        pid=0,
-                        processor="",
-                        python_exe=system_and_os_info["executable"],
-                        python_version_verbose=system_and_os_info["python"],
-                        python_version=system_and_os_info["python"],
-                        user=system_and_os_info["username"],
-                    )
-                    self.experiment._enqueue_message(message)
-                    # Set the filename separately
-                    ## self.experiment.set_filename(system_and_os_info['program'])
-                    # Set the args separately
-                    self.download_parameters(system_and_os_info["args"])
-                    # Set git separately:
-                    if "git" in system_and_os_info:
-                        commit = system_and_os_info["git"]["commit"]
-                        origin = remote = system_and_os_info["git"]["remote"]
-                        if remote.endswith(".git"):
-                            remote = remote[:-4]
-                        git_metadata = {
-                            "parent": commit,
-                            "repo_name": remote,
-                            "status": None,
-                            "user": None,
-                            "root": None,
-                            "branch": None,
-                            "origin": origin,
-                        }
-                        #message = GitMetadataMessage.create(
-                        #    context=self.experiment.context,
-                        #    use_http_messages=self.experiment.streamer.use_http_messages,
-                        #    git_metadata=git_metadata,
-                        #)
-                        #self.experiment._enqueue_message(message)
-                    # Log the entire file as well:
-                    #self.experiment._log_asset(
-                    #    f"{tmpdirname}/wandb-metadata.json",
-                    #    asset_type='wandb-metadata' # TODO: backend changes unknown asset type to "others"
-                    #)
-                elif name == "diff.patch":
-                    git_patch = file.download(root=tmpdirname).read()
+                    with
+                        git_patch = file.download(root=tmpdirname).read()
                     _, zip_path = compress_git_patch(git_patch)
+                    """
+                    """
                     processor = GitPatchUploadProcessor(
                         TemporaryFilePath(zip_path),
                         self.experiment.asset_upload_limit,
@@ -336,9 +288,6 @@ class DownloadManager:
                         tmp_dir=self.experiment.tmpdir,
                         critical=False,
                     )
-                    upload_message = processor.process()
-                    if upload_message:
-                        self.experiment._enqueue_message(upload_message)
                     """
                 elif "media/images" in path:
                     self.download_image(run, file)
@@ -361,8 +310,83 @@ class DownloadManager:
             # After all of the file downloads, log others:
             self.download_others(run, others)
             self.download_asset_metadata(run)
+            self.download_hyper_parameters(run.config)
+            self.write_parameters(run)
 
-    def download_artifact(
+    def download_hyper_parameters(self, config):
+        # FIXME: may need to unpack these
+        for key, value in config.items():
+            self.parameters.append(
+                {
+                    "name": key,
+                    "valueMax": value,
+                    "valueMin": value,
+                    "valueCurrent": value,
+                    "editable": False,
+                }
+            )
+
+    def write_parameters(self, run):
+        path = self.get_path(run, filename="parameters.json")
+        with open(path, "w") as fp:
+            fp.write(json.dumps(self.parameters) + "\n")
+
+    def download_system_details(self, run, file):
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            system_and_os_info = json.load(file.download(root=tmpdirname))
+        args = system_and_os_info["args"]
+        system_details = {
+            "command": [system_and_os_info["program"]] + args
+            if args
+            else [system_and_os_info["program"]],
+            "env": None,
+            "hostname": system_and_os_info["host"],
+            "ip": "",
+            "machine": "",
+            "osRelease": system_and_os_info["os"],
+            "osType": system_and_os_info["os"],
+            "os": system_and_os_info["os"],
+            "pid": 0,
+            "processor": "",
+            "executable": system_and_os_info["executable"],
+            "pythonVersionVerbose": system_and_os_info["python"],
+            "pythonVersion": system_and_os_info["python"],
+            "user": system_and_os_info["username"],
+        }
+        path = self.get_path(run, filename="system_details.json")
+        with open(path, "w") as fp:
+            fp.write(json.dumps(system_details) + "\n")
+        # ---
+        self.download_cmd_parameters(run, args)
+        # ---
+        if "git" in system_and_os_info:
+            commit = system_and_os_info["git"]["commit"]
+            origin = system_and_os_info["git"]["remote"]
+            git_metadata = {
+                "parent": commit,
+                "user": None,
+                "root": None,
+                "branch": None,
+                "origin": origin,
+            }
+            path = self.get_path(run, "run", filename="get_metadata.json")
+            with open(path, "w") as fp:
+                fp.write(json.dumps(git_metadata) + "\n")
+        """
+        # Set the filename separately
+        ## self.experiment.set_filename(system_and_os_info['program'])
+        """
+        # Log the entire file as well:
+        path = self.get_path(run, "assets", filename="wandb-metadata.json")
+        with open(path, "w") as fp:
+            fp.write(json.dumps(system_and_os_info) + "\n")
+
+    def download_artifact(self, run, file):
+        _, artifact_id, artifact_name = file.name.split("/", 2)
+        path = self.get_path(run, "artifacts", artifact_id, filename=artifact_name)
+        self.download_file(path, file)
+
+    def download_artifact_by_name(
         self,
         workspace,
         project,
@@ -424,21 +448,38 @@ class DownloadManager:
                     step = row.get("_step", None)
                     timestamp = row.get("_timestamp", None)
                     value = row.get(metric, None)
-                    if (
-                        metric is not None
-                        and value is not None
-                        and not math.isnan(value)
-                    ):
-                        ts = int(timestamp * 1000) if timestamp is not None else None
-                        data = {
-                            "metricName": metric,
-                            "metricValue": value,
-                            "timestamp": ts,
-                            "step": step,
-                            "epoch": None,
-                            "runContext": None,
-                        }
-                        fp.write(json.dumps(data) + "\n")
+                    if isinstance(value, dict):
+                        for key in value:
+                            ts = (
+                                int(timestamp * 1000) if timestamp is not None else None
+                            )
+                            data = {
+                                "metricName": key,
+                                "metricValue": value[key],
+                                "timestamp": ts,
+                                "step": step,
+                                "epoch": None,
+                                "runContext": None,
+                            }
+                            fp.write(json.dumps(data) + "\n")
+                    else:
+                        if (
+                            metric is not None
+                            and value is not None
+                            and not math.isnan(value)
+                        ):
+                            ts = (
+                                int(timestamp * 1000) if timestamp is not None else None
+                            )
+                            data = {
+                                "metricName": metric,
+                                "metricValue": value,
+                                "timestamp": ts,
+                                "step": step,
+                                "epoch": None,
+                                "runContext": None,
+                            }
+                            fp.write(json.dumps(data) + "\n")
 
     def download_reports(self, workspace, project):
         if self.flat:

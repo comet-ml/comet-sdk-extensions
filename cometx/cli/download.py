@@ -104,12 +104,6 @@ def get_parser_arguments(parser):
         default=[],
     )
     parser.add_argument(
-        "--update",
-        help="Whether to update or replace (if --force)",
-        action="store_true",
-        default=False,
-    )
-    parser.add_argument(
         "-j",
         "--parallel",
         help="The number of threads to use for parallel downloading; default (None) is based on CPUs",
@@ -223,7 +217,6 @@ def download(parsed_args, remaining=None):
                 debug=parsed_args.debug,
                 query=parsed_args.query,
                 max_workers=max_workers,
-                update=parsed_args.update,
             )
             downloader.end()
         except InvalidAPIKey:
@@ -251,7 +244,6 @@ def download(parsed_args, remaining=None):
             skip=parsed_args.skip,
             debug=parsed_args.debug,
             query=parsed_args.query,
-            update=parsed_args.update,
         )
         dm.download(parsed_args.PATH)
 
