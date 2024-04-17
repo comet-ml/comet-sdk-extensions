@@ -19,7 +19,6 @@ import tempfile
 from urllib.parse import unquote
 
 from comet_ml.cli_args_parse import _parse_cmd_args, _parse_cmd_args_naive
-from comet_ml.connection import compress_git_patch
 from comet_ml.utils import makedirs
 
 import wandb
@@ -271,24 +270,7 @@ class DownloadManager:
                     ## System info etc
                     self.download_system_details(run, file)
                 elif name == "diff.patch":
-                    # FIXME
-                    """
-                    with
-                        git_patch = file.download(root=tmpdirname).read()
-                    _, zip_path = compress_git_patch(git_patch)
-                    """
-                    """
-                    processor = GitPatchUploadProcessor(
-                        TemporaryFilePath(zip_path),
-                        self.experiment.asset_upload_limit,
-                        url_params=None,
-                        metadata=None,
-                        copy_to_tmp=False,
-                        error_message_identifier=None,
-                        tmp_dir=self.experiment.tmpdir,
-                        critical=False,
-                    )
-                    """
+                    self.download_git_patch(run, file)
                 elif "media/images" in path:
                     self.download_image(run, file)
                 elif any(
@@ -312,6 +294,10 @@ class DownloadManager:
             self.download_asset_metadata(run)
             self.download_hyper_parameters(run.config)
             self.write_parameters(run)
+
+    def download_git_patch(self, run, file):
+        path = self.get_path(run, "run", filename="git_diff.patch")
+        self.download_file(path, file)
 
     def download_hyper_parameters(self, config):
         # FIXME: may need to unpack these
@@ -369,7 +355,7 @@ class DownloadManager:
                 "branch": None,
                 "origin": origin,
             }
-            path = self.get_path(run, "run", filename="get_metadata.json")
+            path = self.get_path(run, "run", filename="git_metadata.json")
             with open(path, "w") as fp:
                 fp.write(json.dumps(git_metadata) + "\n")
         """
@@ -393,7 +379,7 @@ class DownloadManager:
         artifact_name,
         alias,
     ):
-        # FIXME: add to main loop
+        # Utility, not used here
         """
         Example:
 
@@ -449,19 +435,8 @@ class DownloadManager:
                     timestamp = row.get("_timestamp", None)
                     value = row.get(metric, None)
                     if isinstance(value, dict):
-                        for key in value:
-                            ts = (
-                                int(timestamp * 1000) if timestamp is not None else None
-                            )
-                            data = {
-                                "metricName": key,
-                                "metricValue": value[key],
-                                "timestamp": ts,
-                                "step": step,
-                                "epoch": None,
-                                "runContext": None,
-                            }
-                            fp.write(json.dumps(data) + "\n")
+                        # ignore here; artifacts or summary metrics?
+                        pass
                     else:
                         if (
                             metric is not None

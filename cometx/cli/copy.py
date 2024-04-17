@@ -37,6 +37,8 @@ Not all combinations are possible:
 | WORKSPACE/PROJ/EXP | N/A                  | Copies experiment      |
 """
 
+# FIXME: how to have output without updating output to experiment?
+
 import argparse
 import glob
 import json
@@ -313,30 +315,6 @@ class CopyManager:
         )
 
     def log_metadata(self, experiment, filename):
-        """
-        {
-         "experimentKey": "10bd1d749bfe48cd933c7e313e7376cd",
-         "experimentName": "unusual_eagle_8578",
-         "optimizationId": "e1679352eab540febb90f9155af5e907",
-         "userName": "dsblank",
-         "projectId": "8c42c401d9554dcdb5813e9df9c89b58",
-         "projectName": "aitk-network",
-         "workspaceName": "dsblank",
-         "filePath": "Jupyter interactive",
-         "fileName": "Jupyter interactive",
-         "throttle": false, "throttleMessage": "",
-         "throttlingReasons": [],
-         "durationMillis": 35312,
-         "startTimeMillis": 1618443472116,
-         "endTimeMillis": 1618443507428,
-         "running": false,
-         "error": null,
-         "hasCrashed": false,
-         "archived": false,
-         "tags": ["tag7", "tag8"],
-         "cometDownloadVersion": "1.2.4"
-         }
-        """
         if self.debug:
             print("log_metadata...")
         if os.path.exists(filename):
@@ -348,31 +326,6 @@ class CopyManager:
                 experiment.set_filename(os.path.join(metadata["fileName"]))
 
     def log_system_details(self, experiment, filename):
-        """
-        {
-         "experimentKey": "10bd1d749bfe48cd933c7e313e7376cd",
-         "user": "root",
-         "pythonVersion": "3.7.10",
-         "pythonVersionVerbose": "3.7.10 (default, Feb 20 2021, 21:17:23) \n[GCC 7.5.0]",
-         "pid": 4923,
-         "osType": "Linux",
-         "os": "Linux-4.19.112+-x86_64-with-Ubuntu-18.04-bionic",
-         "osRelease": "4.19.112+",
-         "machine": "x86_64",
-         "processor": "x86_64",
-         "ip": "172.28.0.2",
-         "hostname": "6bd59496ca63",
-         "env": {"NO_GCE_CHECK": "True", ...}",
-         "gpuStaticInfoList": [],
-         "logAdditionalSystemInfoList": [],
-         "systemMetricNames": ["sys.cpu.percent.02", "sys.cpu.percent.01", "sys.ram.total", "sys.cpu.percent.avg", "sys.ram.used"],
-         "maxTotalMemory": null,
-         "networkInterfaceIps": null,
-         "command": ["/usr/local/lib/python3.7/dist-packages/ipykernel_launcher.py", "-f", "/root/.local/share/jupyter/runtime/kernel-d698a690-b9e0-4e47-ad8a-cfbc2de3c1f1.json"],
-         "executable": "/usr/bin/python3",
-         "totalRam": 13653573632.0
-        }
-        """
         if self.debug:
             print("log_system_details...")
         if os.path.exists(filename):
@@ -406,30 +359,6 @@ class CopyManager:
             experiment.set_model_graph(open(filename).read())
 
     def log_assets(self, experiment, path, assets_metadata):
-        """
-        {"fileName": "text-sample-3.txt",
-         "fileSize": 37,
-         "runContext": null,
-         "step": 3,
-         "remote": false,
-         "link": "",
-         "compressedAssetLink": "",
-         "s3Link": "",
-         "createdAt": 1694757164606,
-         "dir": "text-samples",
-         "canView": false,
-         "audio": false,
-         "video": false,
-         "histogram": false,
-         "image": false,
-         "type": "text-sample",
-         "metadata": null,
-         "assetId": "0f8faff37fda4d40b7e0f5c665c3611a",
-         "tags": [],
-         "curlDownload": "",
-         "experimentKey": "92ecd97e311c41939c7f68ddec98ba67"
-        }
-        """
         if self.debug:
             print("log_assets...")
         for log_filename in assets_metadata:
@@ -675,6 +604,11 @@ class CopyManager:
             )
             self.log_git_patch(
                 experiment, os.path.join(experiment_folder, "run", "git_diff.patch")
+            )
+
+        if "code" not in self.ignore:
+            self.log_code(
+                experiment, os.path.join(experiment_folder, "run", "script.py")
             )
 
         # FIXME:
