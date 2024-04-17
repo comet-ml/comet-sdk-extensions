@@ -380,10 +380,14 @@ class CopyManager:
 
             if asset_type == "notebook":
                 experiment.log_notebook(filename)  # done!
+                # FIXME:
                 # elif asset_type == "confusion-matrix":
                 # TODO: what to do about assets referenced in matrix?
                 # elif asset_type == "embedding":
                 # TODO: what to do about assets referenced in embedding?
+            elif asset_type == "model-element":
+                name = os.path.basename(filename)
+                experiment.log_model(name, filename)
             else:
                 binary_io = open(filename, "rb")
 
@@ -438,7 +442,6 @@ class CopyManager:
                 epoch = dict_line["epoch"]
                 context = dict_line["runContext"]
                 timestamp = dict_line["timestamp"]
-                # FIXME: does not log time, duration
                 message = MetricMessage(
                     context=context,
                     timestamp=timestamp,
@@ -610,9 +613,6 @@ class CopyManager:
             self.log_code(
                 experiment, os.path.join(experiment_folder, "run", "script.py")
             )
-
-        # FIXME:
-        ## models
 
 
 def main(args):

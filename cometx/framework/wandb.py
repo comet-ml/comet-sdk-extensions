@@ -151,8 +151,8 @@ class DownloadManager:
     def download_model(self, run, file):
         print("    downloading model...")
         filename = self.get_file_name(file)
-        path = self.get_path(run, "assets", "model", filename=filename)
-        self.download_asset(path, file)
+        path = self.get_path(run, "assets", "model-element", filename=filename)
+        self.download_file(path, file)
 
     def download_image(self, run, file):
         print("    downloading image...")
