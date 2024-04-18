@@ -16,12 +16,12 @@ import os
 import re
 import shutil
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import unquote
 
+import wandb
 from comet_ml.cli_args_parse import _parse_cmd_args, _parse_cmd_args_naive
 from comet_ml.utils import makedirs
-
-import wandb
 
 from ..utils import download_url, remove_extra_slashes
 
@@ -43,6 +43,7 @@ class DownloadManager:
         skip=False,
         debug=False,
         query=None,
+        max_workers=1,
     ):
         self.api = wandb.Api(timeout=60)
 
@@ -54,8 +55,40 @@ class DownloadManager:
         self.filename = filename
         self.asset_type = asset_type
         self.overwrite = overwrite
+        if max_workers > 1:
+            self.queue = ThreadPoolExecutor(max_workers=max_workers)
+        else:
+            self.queue = None
         self.ignore = ignore if ignore else []
         self.include_experiments = None
+
+    def download_file_task(self, path, file):
+        def task():
+            with tempfile.TemporaryDirectory() as tmpdir:
+                file.download(root=tmpdir)
+                shutil.copy(os.path.join(tmpdir, file.name), path)
+
+        if self.queue is None:
+            # Do it now:
+            task()
+        else:
+            # add to queue
+            self.queue.submit(task)
+
+    def download_metrics_task(self, run):
+        def task():
+            self.download_metrics(run)
+
+        if self.queue is None:
+            # Do it now:
+            task()
+        else:
+            # add to queue
+            self.queue.submit(task)
+
+    def end(self):
+        if self.queue is not None:
+            self.queue.shutdown(wait=True)
 
     def reset_run(self):
         self.asset_metadata = []
@@ -146,25 +179,25 @@ class DownloadManager:
     def download_model_graph(self, run, file):
         print("    downloading model graph...")
         path = self.get_path(run, "run", filename="graph_definition.txt")
-        self.download_file(path, file)
+        self.download_file_task(path, file)
 
     def download_model(self, run, file):
         print("    downloading model...")
         filename = self.get_file_name(file)
         path = self.get_path(run, "assets", "model-element", filename=filename)
-        self.download_file(path, file)
+        self.download_file_task(path, file)
 
     def download_image(self, run, file):
         print("    downloading image...")
         filename = self.get_file_name(file)
         path = self.get_path(run, "assets", "image", filename=filename)
-        self.download_file(path, file)
+        self.download_file_task(path, file)
 
     def download_asset(self, run, file):
         print("    downloading asset...")
         filename = self.get_file_name(file)
         path = self.get_path(run, "assets", "asset", filename=filename)
-        self.download_file(path, file)
+        self.download_file_task(path, file)
 
     def download_asset_data(self, run, data, filename):
         path = self.get_path(run, "assets", "asset", filename=filename)
@@ -173,17 +206,17 @@ class DownloadManager:
     def download_code(self, run, file):
         print("    downloading code...")
         path = self.get_path(run, "run", filename="script.py")
-        self.download_file(path, file)
+        self.download_file_task(path, file)
 
     def download_output(self, run, file):
         print("    downloading output...")
         path = self.get_path(run, "run", filename="output.txt")
-        self.download_file(path, file)
+        self.download_file_task(path, file)
 
     def download_dependencies(self, run, file):
         print("    downloading dependencies...")
         path = self.get_path(run, "run", filename="requirements.txt")
-        self.download_file(path, file)
+        self.download_file_task(path, file)
 
     def download_asset_metadata(self, run):
         path = self.get_path(run, "assets", filename="assets_metadata.jsonl")
@@ -242,7 +275,7 @@ class DownloadManager:
                 others["Run"] = run.name
             # Handle all of the specific run items below:
             if "metrics" not in self.ignore:
-                self.download_metrics(run)
+                self.download_metrics_task(run)
 
             # Handle assets (things that have a filename) here:
             for file in list(run.files()):
@@ -297,7 +330,7 @@ class DownloadManager:
 
     def download_git_patch(self, run, file):
         path = self.get_path(run, "run", filename="git_diff.patch")
-        self.download_file(path, file)
+        self.download_file_task(path, file)
 
     def download_hyper_parameters(self, config):
         # FIXME: may need to unpack these
@@ -322,9 +355,11 @@ class DownloadManager:
             system_and_os_info = json.load(file.download(root=tmpdirname))
         args = system_and_os_info["args"]
         system_details = {
-            "command": [system_and_os_info["program"]] + args
-            if args
-            else [system_and_os_info["program"]],
+            "command": (
+                [system_and_os_info["program"]] + args
+                if args
+                else [system_and_os_info["program"]]
+            ),
             "env": None,
             "hostname": system_and_os_info["host"],
             "ip": "",
@@ -359,6 +394,7 @@ class DownloadManager:
             with open(path, "w") as fp:
                 fp.write(json.dumps(git_metadata) + "\n")
         """
+        # FIXME:
         # Set the filename separately
         ## self.experiment.set_filename(system_and_os_info['program'])
         """
@@ -370,7 +406,7 @@ class DownloadManager:
     def download_artifact(self, run, file):
         _, artifact_id, artifact_name = file.name.split("/", 2)
         path = self.get_path(run, "artifacts", artifact_id, filename=artifact_name)
-        self.download_file(path, file)
+        self.download_file_task(path, file)
 
     def download_artifact_by_name(
         self,

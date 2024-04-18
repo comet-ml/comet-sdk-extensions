@@ -194,12 +194,13 @@ def download(parsed_args, remaining=None):
         display_invalid_api_key()
         return
 
+    max_workers = (
+        min(32, os.cpu_count() + 4)
+        if parsed_args.parallel is None
+        else parsed_args.parallel
+    )
+
     if parsed_args.FROM == "comet":
-        max_workers = (
-            min(32, os.cpu_count() + 4)
-            if parsed_args.parallel is None
-            else parsed_args.parallel
-        )
         try:
             downloader.download(
                 comet_path=parsed_args.PATH,
@@ -218,6 +219,7 @@ def download(parsed_args, remaining=None):
                 query=parsed_args.query,
                 max_workers=max_workers,
             )
+            print("Waiting on threaded downloads...")
             downloader.end()
         except InvalidAPIKey:
             display_invalid_api_key()
@@ -244,8 +246,20 @@ def download(parsed_args, remaining=None):
             skip=parsed_args.skip,
             debug=parsed_args.debug,
             query=parsed_args.query,
+            max_workers=max_workers,
         )
-        dm.download(parsed_args.PATH)
+
+        try:
+            dm.download(parsed_args.PATH)
+            print("Waiting on threaded downloads...")
+            dm.end()
+        except Exception as exc:
+            if parsed_args.debug:
+                raise exc from None
+            else:
+                print("Download aborted: %s" % str(exc))
+        except KeyboardInterrupt:
+            print("User canceled download by keyboard interrupt")
 
 
 def main(args):
