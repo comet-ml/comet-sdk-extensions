@@ -428,9 +428,10 @@ class CopyManager:
 
     def log_metrics(self, experiment, filename):
         """ """
-        if self.debug:
-            print("log_metrics...")
         if os.path.exists(filename):
+            if self.debug:
+                print("log_metrics %s..." % filename)
+
             for line in open(filename):
                 dict_line = json.loads(line)
                 name = dict_line["metricName"]
@@ -447,6 +448,22 @@ class CopyManager:
                 )
                 message.set_metric(name, value, step=step, epoch=epoch)
                 experiment._enqueue_message(message)
+
+    def log_metrics_split(self, experiment, folder):
+        """ """
+        summary_filename = os.path.join(folder, "metrics_summary.jsonl")
+        if os.path.exists(summary_filename):
+            if self.debug:
+                print("log_metrics from %s..." % summary_filename)
+
+            for line in open(summary_filename):
+                metric_summary = json.loads(line)
+                self.log_metrics(
+                    experiment,
+                    os.path.join(
+                        folder, "metrics", "metric_%05d.jsonl" % metric_summary["count"]
+                    ),
+                )
 
     def log_parameters(self, experiment, filename):
         """ """
@@ -541,9 +558,12 @@ class CopyManager:
         """ """
         # FIXME: missing notes (edited by human, not logged programmatically)
         if "metrics" not in self.ignore:
+            # All together, in one file:
             self.log_metrics(
                 experiment, os.path.join(experiment_folder, "metrics.jsonl")
             )
+            # In separate files:
+            self.log_metrics_split(experiment, experiment_folder)
 
         if "metadata" not in self.ignore:
             self.log_metadata(

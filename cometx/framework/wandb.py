@@ -75,17 +75,6 @@ class DownloadManager:
             # add to queue
             self.queue.submit(task)
 
-    def download_metrics_task(self, run):
-        def task():
-            self.download_metrics(run)
-
-        if self.queue is None:
-            # Do it now:
-            task()
-        else:
-            # add to queue
-            self.queue.submit(task)
-
     def end(self):
         if self.queue is not None:
             self.queue.shutdown(wait=True)
@@ -275,7 +264,7 @@ class DownloadManager:
                 others["Run"] = run.name
             # Handle all of the specific run items below:
             if "metrics" not in self.ignore:
-                self.download_metrics_task(run)
+                self.download_metrics(run)
 
             # Handle assets (things that have a filename) here:
             for file in list(run.files()):
@@ -453,19 +442,18 @@ class DownloadManager:
                     return True
         return False
 
-    def download_metrics(self, run):
-        print("    downloading metrics...")
-        filename = self.get_path(run, filename="metrics.jsonl")
-        with open(filename, "w") as fp:
-            metrics = list(run.history(pandas=False, samples=1)[0].keys())
-            for metric in metrics:
-                if self.ignore_metric_name(metric):
-                    continue
-                metric_data = run.history(
-                    keys=[metric, "_timestamp"],
-                    pandas=False,
-                    samples=MAX_METRIC_SAMPLES,
-                )
+    def download_metric_task(self, metric, run, count):
+        def task():
+            print("        downloading metric %r..." % metric)
+            metric_data = run.history(
+                keys=[metric, "_timestamp"],
+                pandas=False,
+                samples=MAX_METRIC_SAMPLES,
+            )
+            filename = self.get_path(
+                run, "metrics", filename="metric_%05d.jsonl" % count
+            )
+            with open(filename, "w") as fp:
                 for row in metric_data:
                     step = row.get("_step", None)
                     timestamp = row.get("_timestamp", None)
@@ -491,6 +479,24 @@ class DownloadManager:
                                 "runContext": None,
                             }
                             fp.write(json.dumps(data) + "\n")
+
+        if self.queue is None:
+            # Do it now:
+            task()
+        else:
+            # add to queue
+            self.queue.submit(task)
+
+    def download_metrics(self, run):
+        print("    downloading metrics...")
+        metrics = list(run.history(pandas=False, samples=1)[0].keys())
+        metrics_summary_path = self.get_path(run, filename="metrics_summary.jsonl")
+        with open(metrics_summary_path, "w") as fp:
+            for count, metric in enumerate(metrics):
+                if self.ignore_metric_name(metric):
+                    continue
+                fp.write(json.dumps({"metric": metric, "count": count}) + "\n")
+                self.download_metric_task(metric, run, count)
 
     def download_reports(self, workspace, project):
         if self.flat:
