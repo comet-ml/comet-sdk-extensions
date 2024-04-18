@@ -300,7 +300,6 @@ class CopyManager:
                 experiment.end()
             self.copied_reports = True
 
-        # if project doesn't exist, create it
         experiment = self.create_experiment(workspace_dst, project_dst)
 
         # copy experiment_folder stuff to experiment
@@ -455,10 +454,10 @@ class CopyManager:
             print("log_parameters...")
         if os.path.exists(filename):
             parameters = json.load(open(filename))
-            for parameter in parameters:
-                name = parameter["name"]
-                value = parameter["valueCurrent"]
-                experiment.log_parameter(name, value)
+            parameter_dictionary = {
+                parameter["name"]: parameter["valueCurrent"] for parameter in parameters
+            }
+            experiment.log_parameters(parameter_dictionary, nested_support=True)
 
     def log_others(self, experiment, filename):
         """ """
