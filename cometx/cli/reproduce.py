@@ -96,6 +96,8 @@ def reproduce(parsed_args, remaining=None):
         shell_commands += "conda activate reproduced-env\n"
     if os.path.exists(os.path.join(parsed_args.OUTPUT_DIR, "requirements.txt")):
         shell_commands += "pip install -r requirements.txt\n"
+    if os.path.exists(os.path.join(parsed_args.OUTPUT_DIR, "git_diff.patch")):
+        shell_commands += "git apply git_diff.patch\n"
     if os.path.exists(os.path.join(parsed_args.OUTPUT_DIR, "git_metadata.json")):
         shell_commands += manager.get_git_text(experiment)
         script = "../script.py"
