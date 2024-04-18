@@ -262,7 +262,7 @@ class DownloadManager:
                 elif name == "wandb-summary.json":
                     with tempfile.TemporaryDirectory() as tmpdirname:
                         summary = json.load(file.download(root=tmpdirname))
-                        # list of all of the metrics
+                        # list of all of the metrics, etc
                         self.download_asset_data(
                             run, json.dumps(summary), "wandb_summary.json"
                         )
