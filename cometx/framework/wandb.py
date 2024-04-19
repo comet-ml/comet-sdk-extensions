@@ -19,9 +19,11 @@ import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import unquote
 
-import wandb
+import comet_ml
 from comet_ml.cli_args_parse import _parse_cmd_args, _parse_cmd_args_naive
 from comet_ml.utils import makedirs
+
+import wandb
 
 from ..utils import download_url, remove_extra_slashes
 
@@ -170,6 +172,21 @@ class DownloadManager:
         path = self.get_path(run, "run", filename="graph_definition.txt")
         self.download_file_task(path, file)
 
+    def download_metadata(self, run, info, workspace, project):
+        print("    downloading metadata...")
+        metadata = {
+            "experimentName": run.name,
+            "userName": info["username"],
+            "projectName": project,
+            "workspaceName": workspace,
+            "filePath": info["program"],
+            "fileName": info["program"],
+            "cometDownloadVersion": comet_ml.__version__,
+        }
+        path = self.get_path(run, "run", filename="metadata.json")
+        with open(path, "w") as fp:
+            fp.write(json.dumps(metadata) + "\n")
+
     def download_model(self, run, file):
         print("    downloading model...")
         filename = self.get_file_name(file)
@@ -290,7 +307,7 @@ class DownloadManager:
                         )
                 elif name == "wandb-metadata.json":
                     ## System info etc
-                    self.download_system_details(run, file)
+                    self.download_system_details(run, file, workspace, project)
                 elif name == "diff.patch":
                     self.download_git_patch(run, file)
                 elif "media/images" in path:
@@ -339,7 +356,7 @@ class DownloadManager:
         with open(path, "w") as fp:
             fp.write(json.dumps(self.parameters) + "\n")
 
-    def download_system_details(self, run, file):
+    def download_system_details(self, run, file, workspace, project):
         with tempfile.TemporaryDirectory() as tmpdirname:
             system_and_os_info = json.load(file.download(root=tmpdirname))
         args = system_and_os_info["args"]
@@ -368,6 +385,7 @@ class DownloadManager:
             fp.write(json.dumps(system_details) + "\n")
         # ---
         self.download_cmd_parameters(run, args)
+        self.download_metadata(run, system_and_os_info, workspace, project)
         # ---
         if "git" in system_and_os_info:
             commit = system_and_os_info["git"]["commit"]
