@@ -251,6 +251,18 @@ class CopyManager:
             auto_histogram_activation_logging=False,
             experiment_key=None,
         )
+
+        def filter_messages(method):
+            def filtered_method(message):
+                if hasattr(message, "context") and message.context == "ignore":
+                    return
+                method(message)
+
+            return filtered_method
+
+        experiment.streamer.put_message_in_q = filter_messages(
+            experiment.streamer.put_message_in_q
+        )
         return experiment
 
     def get_experiment_folders(self, workspace_src, project_src, experiment_src):
@@ -301,7 +313,6 @@ class CopyManager:
             self.copied_reports = True
 
         experiment = self.create_experiment(workspace_dst, project_dst)
-
         # copy experiment_folder stuff to experiment
         # copy all resources to existing or new experiment
         self.log_all(experiment, experiment_folder)
@@ -315,7 +326,8 @@ class CopyManager:
 
     def log_metadata(self, experiment, filename):
         if self.debug:
-            print("log_metadata...")
+            with experiment.context_manager("ignore"):
+                print("log_metadata...")
         if os.path.exists(filename):
             metadata = json.load(open(filename))
             experiment.add_tags(metadata["tags"])
@@ -326,7 +338,8 @@ class CopyManager:
 
     def log_system_details(self, experiment, filename):
         if self.debug:
-            print("log_system_details...")
+            with experiment.context_manager("ignore"):
+                print("log_system_details...")
         if os.path.exists(filename):
             system = json.load(open(filename))
 
@@ -353,13 +366,15 @@ class CopyManager:
 
     def log_graph(self, experiment, filename):
         if self.debug:
-            print("log_graph...")
+            with experiment.context_manager("ignore"):
+                print("log_graph...")
         if os.path.exists(filename):
             experiment.set_model_graph(open(filename).read())
 
     def log_assets(self, experiment, path, assets_metadata):
         if self.debug:
-            print("log_assets...")
+            with experiment.context_manager("ignore"):
+                print("log_assets...")
         for log_filename in assets_metadata:
             asset_type = assets_metadata[log_filename].get("type", None)
             asset_type = asset_type if asset_type else "asset"
@@ -371,7 +386,8 @@ class CopyManager:
                 filename = os.path.join(path, asset_type, log_filename)
 
             if not os.path.isfile(filename):
-                print("Missing file %r: unable to copy" % filename)
+                with experiment.context_manager("ignore"):
+                    print("Missing file %r: unable to copy" % filename)
                 continue
 
             metadata = assets_metadata[log_filename].get("metadata")
@@ -402,7 +418,8 @@ class CopyManager:
     def log_code(self, experiment, filename):
         """ """
         if self.debug:
-            print("log_code...")
+            with experiment.context_manager("ignore"):
+                print("log_code...")
         if os.path.exists(filename):
             if os.path.isfile(filename):
                 experiment.log_code(str(filename))
@@ -414,7 +431,8 @@ class CopyManager:
         Requirements (pip packages)
         """
         if self.debug:
-            print("log_requirements...")
+            with experiment.context_manager("ignore"):
+                print("log_requirements...")
         if os.path.exists(filename):
             installed_packages_list = [package.strip() for package in open(filename)]
             if installed_packages_list is None:
@@ -430,7 +448,8 @@ class CopyManager:
         """ """
         if os.path.exists(filename):
             if self.debug:
-                print("log_metrics %s..." % filename)
+                with experiment.context_manager("ignore"):
+                    print("log_metrics %s..." % filename)
 
             for line in open(filename):
                 dict_line = json.loads(line)
@@ -454,7 +473,8 @@ class CopyManager:
         summary_filename = os.path.join(folder, "metrics_summary.jsonl")
         if os.path.exists(summary_filename):
             if self.debug:
-                print("log_metrics from %s..." % summary_filename)
+                with experiment.context_manager("ignore"):
+                    print("log_metrics from %s..." % summary_filename)
 
             for line in open(summary_filename):
                 metric_summary = json.loads(line)
@@ -468,7 +488,8 @@ class CopyManager:
     def log_parameters(self, experiment, filename):
         """ """
         if self.debug:
-            print("log_parameters...")
+            with experiment.context_manager("ignore"):
+                print("log_parameters...")
         if os.path.exists(filename):
             parameters = json.load(open(filename))
             parameter_dictionary = {
@@ -479,7 +500,8 @@ class CopyManager:
     def log_others(self, experiment, filename):
         """ """
         if self.debug:
-            print("log_others...")
+            with experiment.context_manager("ignore"):
+                print("log_others...")
         if os.path.exists(filename):
             for line in open(filename):
                 dict_line = json.loads(line)
@@ -490,7 +512,8 @@ class CopyManager:
     def log_output(self, experiment, output_file):
         """ """
         if self.debug:
-            print("log_output...")
+            with experiment.context_manager("ignore"):
+                print("log_output...")
         if os.path.exists(output_file):
             for line in open(output_file):
                 message = StandardOutputMessage.create(
@@ -503,7 +526,8 @@ class CopyManager:
 
     def log_html(self, experiment, filename):
         if self.debug:
-            print("log_html...")
+            with experiment.context_manager("ignore"):
+                print("log_html...")
         if os.path.exists(filename):
             html = open(filename).read()
             message = HtmlMessage.create(
