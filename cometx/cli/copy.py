@@ -37,8 +37,6 @@ Not all combinations are possible:
 | WORKSPACE/PROJ/EXP | N/A                  | Copies experiment      |
 """
 
-# FIXME: how to have output without updating output to experiment?
-
 import argparse
 import glob
 import json

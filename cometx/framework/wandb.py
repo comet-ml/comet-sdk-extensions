@@ -21,6 +21,7 @@ from urllib.parse import unquote
 
 import comet_ml
 from comet_ml.cli_args_parse import _parse_cmd_args, _parse_cmd_args_naive
+from comet_ml.data_structure import Histogram
 from comet_ml.utils import makedirs
 
 import wandb
@@ -199,6 +200,30 @@ class DownloadManager:
         path = self.get_path(run, "assets", "image", filename=filename)
         self.download_file_task(path, file)
 
+    def download_audio(self, run, file):
+        print("    downloading audio...")
+        filename = self.get_file_name(file)
+        path = self.get_path(run, "assets", "audio", filename=filename)
+        self.download_file_task(path, file)
+
+    def download_video(self, run, file):
+        print("    downloading video...")
+        filename = self.get_file_name(file)
+        path = self.get_path(run, "assets", "video", filename=filename)
+        self.download_file_task(path, file)
+
+    def download_text(self, run, file):
+        print("    downloading text...")
+        filename = self.get_file_name(file)
+        path = self.get_path(run, "assets", "text", filename=filename)
+        self.download_file_task(path, file)
+
+    def download_html(self, run, file):
+        print("    downloading html...")
+        filename = self.get_file_name(file)
+        path = self.get_path(run, "assets", "html", filename=filename)
+        self.download_file_task(path, file)
+
     def download_asset(self, run, file):
         print("    downloading asset...")
         filename = self.get_file_name(file)
@@ -292,6 +317,17 @@ class DownloadManager:
 
                 elif path == "media/graph" and "graph" not in self.ignore:
                     self.download_model_graph(run, file)
+                elif path == "media/images" and "image" not in self.ignore:
+                    # FIXME: bounding boxes, (bb and bit masks are saved in assets)
+                    self.download_image(run, file)
+                elif path == "media/audio" and "audio" not in self.ignore:
+                    self.download_audio(run, file)
+                elif path == "media/video" and "video" not in self.ignore:
+                    self.download_video(run, file)
+                elif path == "media/text" and "text" not in self.ignore:
+                    self.download_text(run, file)
+                elif path == "media/html" and "html" not in self.ignore:
+                    self.download_html(run, file)
                 elif path == "code" and "code" not in self.ignore:
                     self.download_code(run, file)
                 elif name == "output.log" and "output" not in self.ignore:
@@ -301,31 +337,40 @@ class DownloadManager:
                 elif name == "wandb-summary.json":
                     with tempfile.TemporaryDirectory() as tmpdirname:
                         summary = json.load(file.download(root=tmpdirname))
-                        # list of all of the metrics, etc
+                        for item in summary:
+                            # FIXME: anything can be logged to a summary.
+                            # Some are not saved as assets, like histograms:
+                            if (
+                                isinstance(summary[item], dict)
+                                and "_type" in summary[item]
+                                and summary[item]["_type"] == "histogram"
+                            ):
+                                self.write_histogram(run, item, summary[item])
                         self.download_asset_data(
                             run, json.dumps(summary), "wandb_summary.json"
                         )
                 elif name == "wandb-metadata.json":
                     ## System info etc
                     self.download_system_details(run, file, workspace, project)
-                elif name == "diff.patch":
+                elif name == "diff.patch" and "git" not in self.ignore:
                     self.download_git_patch(run, file)
-                elif "media/images" in path:
-                    self.download_image(run, file)
-                elif any(
-                    extension in name
-                    for extension in [
-                        ".pb",
-                        ".onnx",
-                        ".pkl",
-                        ".mlmodel",
-                        ".pmml",
-                        ".pt",
-                        ".h5",
-                    ]
+                elif (
+                    any(
+                        extension in name
+                        for extension in [
+                            ".pb",
+                            ".onnx",
+                            ".pkl",
+                            ".mlmodel",
+                            ".pmml",
+                            ".pt",
+                            ".h5",
+                        ]
+                    )
+                    and "model" not in self.ignore
                 ):
                     self.download_model(run, file)
-                else:
+                elif "asset" not in self.ignore:
                     self.download_asset(run, file)
 
             # After all of the file downloads, log others:
@@ -350,6 +395,18 @@ class DownloadManager:
                     "editable": False,
                 }
             )
+
+    def write_histogram(self, run, name, data):
+        histogram = Histogram()
+        values = [[b] * v for v, b in zip(data["values"], data["bins"])]
+        histogram.add(values)
+        data_dict = {"histograms": [{"step": 0, "histogram": histogram.to_json()}]}
+        # FIXME: clean name for filename
+        path = self.get_path(
+            run, "assets", "histogram_combined_3d", filename="%s.json" % name
+        )
+        with open(path, "w") as fp:
+            fp.write(json.dumps(data_dict) + "\n")
 
     def write_parameters(self, run):
         path = self.get_path(run, filename="parameters.json")
@@ -476,27 +533,21 @@ class DownloadManager:
                     step = row.get("_step", None)
                     timestamp = row.get("_timestamp", None)
                     value = row.get(metric, None)
-                    if isinstance(value, dict):
-                        # ignore here; artifacts or summary metrics?
-                        pass
-                    else:
-                        if (
-                            metric is not None
-                            and value is not None
-                            and not math.isnan(value)
-                        ):
-                            ts = (
-                                int(timestamp * 1000) if timestamp is not None else None
-                            )
-                            data = {
-                                "metricName": metric,
-                                "metricValue": value,
-                                "timestamp": ts,
-                                "step": step,
-                                "epoch": None,
-                                "runContext": None,
-                            }
-                            fp.write(json.dumps(data) + "\n")
+                    if (
+                        metric is not None
+                        and value is not None
+                        and not math.isnan(value)
+                    ):
+                        ts = int(timestamp * 1000) if timestamp is not None else None
+                        data = {
+                            "metricName": metric,
+                            "metricValue": value,
+                            "timestamp": ts,
+                            "step": step,
+                            "epoch": None,
+                            "runContext": None,
+                        }
+                        fp.write(json.dumps(data) + "\n")
 
         if self.queue is None:
             # Do it now:
@@ -507,11 +558,15 @@ class DownloadManager:
 
     def download_metrics(self, run):
         print("    downloading metrics...")
-        metrics = list(run.history(pandas=False, samples=1)[0].keys())
+        samples = run.history(pandas=False, samples=1)[0]
+        metrics = list(samples.keys())
         metrics_summary_path = self.get_path(run, filename="metrics_summary.jsonl")
         with open(metrics_summary_path, "w") as fp:
             for count, metric in enumerate(metrics):
                 if self.ignore_metric_name(metric):
+                    continue
+                # Is it a metric?
+                if samples[metric] is None or isinstance(samples[metric], dict):
                     continue
                 fp.write(json.dumps({"metric": metric, "count": count}) + "\n")
                 self.download_metric_task(metric, run, count)
