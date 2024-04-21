@@ -332,7 +332,7 @@ class DownloadManager:
                 elif path == "media/images" and "image" not in self.ignore:
                     # FIXME: bounding boxes, (bb and bit masks are saved in assets)
                     self.download_image(run, file)
-                elif path == "media/audios" and "audio" not in self.ignore:
+                elif path == "media/audio" and "audio" not in self.ignore:
                     self.download_audio(run, file)
                 elif path == "media/videos" and "video" not in self.ignore:
                     self.download_video(run, file)
@@ -408,14 +408,26 @@ class DownloadManager:
                 }
             )
 
+    def convert_histogram(self, data):
+        if "bins" in data:
+            bins = data["bins"][:-1]
+        elif "packedBins" in data:
+            bins = [data["packedBins"]["min"]]
+            for i in range(data["packedBins"]["count"] - 1):
+                bins.append(bins[-1] + data["packedBins"]["size"])
+        else:
+            raise Exception("unknown histogram type: %s" % data)
+        return (bins, data["values"])
+
     def write_histogram(self, run, name, data):
+        print("    downloading histogram...")
+        values, counts = self.convert_histogram(data)
         histogram = Histogram()
-        values = [[b] * v for v, b in zip(data["values"], data["bins"])]
-        histogram.add(values)
+        histogram.add(values=values, counts=counts)
         data_dict = {"histograms": [{"step": 0, "histogram": histogram.to_json()}]}
         # FIXME: clean name for filename
         path = self.get_path(
-            run, "assets", "histogram_combined_3d", filename="%s.json" % name
+            run, "assets", "histogram_combined_3d", filename="%s_summary.json" % name
         )
         with open(path, "w") as fp:
             fp.write(json.dumps(data_dict) + "\n")
@@ -529,6 +541,30 @@ class DownloadManager:
                     return True
         return False
 
+    def download_histograms(self, run, name):
+        histograms = run.history(
+            keys=[name, "_timestamp"],
+            pandas=False,
+            samples=MAX_METRIC_SAMPLES,
+        )
+        data_dict = {"histograms": []}
+        for row in histograms:
+            step = row.get("_step", None)
+            histogram_data = row.get(name, None)
+            if histogram_data:
+                histogram = Histogram()
+                values, counts = self.convert_histogram(histogram_data)
+                histogram.add(values=values, counts=counts)
+                data_dict["histograms"].append(
+                    {"step": step, "histogram": histogram.to_json()}
+                )
+        # FIXME: clean name for filename
+        path = self.get_path(
+            run, "assets", "histogram_combined_3d", filename="%s_history.json" % name
+        )
+        with open(path, "w") as fp:
+            fp.write(json.dumps(data_dict) + "\n")
+
     def download_metric_task(self, metric, run, count):
         def task():
             print("        downloading metric %r..." % metric)
@@ -578,7 +614,14 @@ class DownloadManager:
                 if self.ignore_metric_name(metric):
                     continue
                 # Is it a metric?
-                if samples[metric] is None or isinstance(samples[metric], dict):
+                if samples[metric] is None:
+                    continue
+                elif isinstance(samples[metric], dict):
+                    if (
+                        "_type" in samples[metric]
+                        and samples[metric]["_type"] == "histogram"
+                    ):
+                        self.download_histograms(run, metric)
                     continue
                 fp.write(json.dumps({"metric": metric, "count": count}) + "\n")
                 self.download_metric_task(metric, run, count)
