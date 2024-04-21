@@ -125,10 +125,20 @@ class DownloadManager:
                 and subdirs[0] == "assets"
                 and subdirs[1] != "assets_metadata.jsonl"
             ):
+                step = None
+                log_as_filename = None
+                parts = filename.rsplit("_", 3)
+                _, ext = os.path.splitext(filename)
+                if len(parts) == 3:
+                    log_as_filename, step, _ = parts
+                    log_as_filename += ext
+                    step = int(step)
                 self.asset_metadata.append(
                     {
                         "fileName": filename,
-                        "type": subdirs[1],
+                        "logAsFileName": log_as_filename,
+                        "type": subdirs[1],  # we'll figure out later
+                        "step": step,
                     }
                 )
         return path
@@ -313,7 +323,6 @@ class DownloadManager:
 
             # Handle assets (things that have a filename) here:
             for file in list(run.files()):
-                # FIXME: if asset in format name_STEP_ID, log step
                 path = self.get_file_path(file)
                 name = file.name
                 if name.startswith("artifact/"):

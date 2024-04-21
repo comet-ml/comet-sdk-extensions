@@ -374,6 +374,12 @@ class CopyManager:
             with experiment.context_manager("ignore"):
                 print("log_assets...")
         for log_filename in assets_metadata:
+            log_as_filename = assets_metadata[log_filename].get(
+                "logAsFileName",
+                None,
+            )
+            step = assets_metadata[log_filename].get("step", None)
+            epoch = assets_metadata[log_filename].get("epoch", None)
             asset_type = assets_metadata[log_filename].get("type", None)
             asset_type = asset_type if asset_type else "asset"
             if asset_type in self.ignore:
@@ -391,15 +397,17 @@ class CopyManager:
             metadata = assets_metadata[log_filename].get("metadata")
             metadata = json.loads(metadata) if metadata else {}
 
-            # FIXME: if asset in format name_STEP_ID, log step
             if asset_type == "notebook":
                 experiment.log_notebook(filename)  # done!
             elif asset_type == "video":
                 name = os.path.basename(filename)
-                experiment.log_video(filename, name)  # done!
+                binary_io = open(filename, "rb")
+
+                experiment.log_video(
+                    binary_io, name=log_as_filename or name, step=step, epoch=epoch
+                )  # done!
                 # FIXME:
-                # elif asset_type == "confusion-matrix":
-                # TODO: what to do about assets referenced in matrix?
+                # TODO: what to do about assets referenced in confusion matrix?
                 # elif asset_type == "embedding":
                 # TODO: what to do about assets referenced in embedding?
             elif asset_type == "model-element":
@@ -410,11 +418,11 @@ class CopyManager:
 
                 experiment._log_asset(
                     binary_io,
-                    file_name=log_filename,
+                    file_name=log_as_filename or log_filename,
                     copy_to_tmp=True,
                     asset_type=asset_type,
                     metadata=metadata,
-                    step=assets_metadata[log_filename].get("step", None),
+                    step=step,
                 )  # done!
 
     def log_code(self, experiment, filename):
