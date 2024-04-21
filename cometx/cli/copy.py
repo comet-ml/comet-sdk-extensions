@@ -391,8 +391,12 @@ class CopyManager:
             metadata = assets_metadata[log_filename].get("metadata")
             metadata = json.loads(metadata) if metadata else {}
 
+            # FIXME: if asset in format name_STEP_ID, log step
             if asset_type == "notebook":
                 experiment.log_notebook(filename)  # done!
+            elif asset_type == "video":
+                name = os.path.basename(filename)
+                experiment.log_video(filename, name)  # done!
                 # FIXME:
                 # elif asset_type == "confusion-matrix":
                 # TODO: what to do about assets referenced in matrix?
@@ -632,6 +636,11 @@ class CopyManager:
             )
 
         if "html" not in self.ignore:
+            # NOTE: also logged as html asset
+            html_filenames = os.path.join(experiment_folder, "assets", "html", "*")
+            for html_filename in glob.glob(html_filenames):
+                self.log_html(experiment, html_filename)
+            # Deprecated:
             self.log_html(
                 experiment,
                 os.path.join(experiment_folder, "experiment.html"),
@@ -651,6 +660,9 @@ class CopyManager:
             )
 
         if "code" not in self.ignore:
+            code_folder = os.path.join(experiment_folder, "run", "code")
+            self.log_code(experiment, code_folder)
+            # Deprecated:
             self.log_code(
                 experiment, os.path.join(experiment_folder, "run", "script.py")
             )

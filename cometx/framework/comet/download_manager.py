@@ -782,7 +782,7 @@ class DownloadManager:
         if self.flat:
             path = self.root
         else:
-            path = self.get_experiment_path(experiment)
+            path = self.get_experiment_path(experiment, "assets", "html")
 
         filepath = os.path.join(path, "experiment.html")
         if self._should_write(filepath):
@@ -1053,6 +1053,7 @@ class DownloadManager:
         else:
             path = self.get_experiment_path(experiment, "run")
 
+        # FIXME: now in run/code/*.py, as original filename
         filepath = os.path.join(path, "script.py")
         if self._should_write(filepath):
             code = experiment.get_code()

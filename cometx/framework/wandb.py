@@ -236,7 +236,10 @@ class DownloadManager:
 
     def download_code(self, run, file):
         print("    downloading code...")
-        path = self.get_path(run, "run", filename="script.py")
+        filepath = self.get_file_path(file)
+        filename = self.get_file_name(file)
+        # NOTE: filepath contains "code/"
+        path = self.get_path(run, "run", filepath, filename=filename)
         self.download_file_task(path, file)
 
     def download_output(self, run, file):
@@ -310,25 +313,25 @@ class DownloadManager:
 
             # Handle assets (things that have a filename) here:
             for file in list(run.files()):
+                # FIXME: if asset in format name_STEP_ID, log step
                 path = self.get_file_path(file)
                 name = file.name
                 if name.startswith("artifact/"):
                     self.download_artifact(run, file)
-
                 elif path == "media/graph" and "graph" not in self.ignore:
                     self.download_model_graph(run, file)
                 elif path == "media/images" and "image" not in self.ignore:
                     # FIXME: bounding boxes, (bb and bit masks are saved in assets)
                     self.download_image(run, file)
-                elif path == "media/audio" and "audio" not in self.ignore:
+                elif path == "media/audios" and "audio" not in self.ignore:
                     self.download_audio(run, file)
-                elif path == "media/video" and "video" not in self.ignore:
+                elif path == "media/videos" and "video" not in self.ignore:
                     self.download_video(run, file)
                 elif path == "media/text" and "text" not in self.ignore:
                     self.download_text(run, file)
                 elif path == "media/html" and "html" not in self.ignore:
                     self.download_html(run, file)
-                elif path == "code" and "code" not in self.ignore:
+                elif path.startswith("code") and "code" not in self.ignore:
                     self.download_code(run, file)
                 elif name == "output.log" and "output" not in self.ignore:
                     self.download_output(run, file)
