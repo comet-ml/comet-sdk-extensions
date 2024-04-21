@@ -128,16 +128,16 @@ class DownloadManager:
                 step = None
                 log_as_filename = None
                 parts = filename.rsplit("_", 3)
-                _, ext = os.path.splitext(filename)
-                if len(parts) == 3:
+                if len(parts) == 3 and parts[1].isdigit():
                     log_as_filename, step, _ = parts
+                    _, ext = os.path.splitext(filename)
                     log_as_filename += ext
                     step = int(step)
                 self.asset_metadata.append(
                     {
                         "fileName": filename,
                         "logAsFileName": log_as_filename,
-                        "type": subdirs[1],  # we'll figure out later
+                        "type": subdirs[1],
                         "step": step,
                     }
                 )
