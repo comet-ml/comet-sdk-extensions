@@ -57,6 +57,7 @@ from comet_ml.messages import (
 )
 
 from ..utils import remove_extra_slashes
+from .copy_utils import upload_single_offline_experiment
 
 ADDITIONAL_ARGS = False
 
@@ -315,12 +316,22 @@ class CopyManager:
         # copy all resources to existing or new experiment
         self.log_all(experiment, experiment_folder)
         experiment.end()
+
         print(
             f"Uploading {experiment.offline_directory}/{experiment._get_offline_archive_file_name()}"
         )
-        os.system(
-            f"comet upload {experiment.offline_directory}/{experiment._get_offline_archive_file_name()}"
+        url = upload_single_offline_experiment(
+            offline_archive_path=os.path.join(
+                experiment.offline_directory,
+                experiment._get_offline_archive_file_name(),
+            ),
+            settings=self.api.config,
+            force_upload=False,
         )
+        if url:
+            print("Experiment copied to: %s" % url)
+        else:
+            print("ERROR: this experiment failed to copy")
 
     def log_metadata(self, experiment, filename):
         if self.debug:
