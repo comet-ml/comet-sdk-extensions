@@ -191,10 +191,10 @@ class DownloadManager:
             "projectName": project,
             "workspaceName": workspace,
             "filePath": info["program"],
-            "fileName": info["program"],
+            "fileName": os.path.basename(info["program"]),
             "cometDownloadVersion": comet_ml.__version__,
         }
-        path = self.get_path(run, "run", filename="metadata.json")
+        path = self.get_path(run, filename="metadata.json")
         with open(path, "w") as fp:
             fp.write(json.dumps(metadata) + "\n")
 
@@ -350,14 +350,18 @@ class DownloadManager:
                     with tempfile.TemporaryDirectory() as tmpdirname:
                         summary = json.load(file.download(root=tmpdirname))
                         for item in summary:
-                            # FIXME: anything can be logged to a summary.
-                            # Some are not saved as assets, like histograms:
                             if (
                                 isinstance(summary[item], dict)
                                 and "_type" in summary[item]
-                                and summary[item]["_type"] == "histogram"
                             ):
-                                self.write_histogram(run, item, summary[item])
+                                if summary[item]["_type"] == "histogram":
+                                    self.write_histogram(run, item, summary[item])
+                                elif summary[item]["_type"].endswith("-file"):
+                                    pass  # This is listed in assets
+                                else:
+                                    print(
+                                        f"Ignoring {summary[item]['_type']} in summary"
+                                    )
                         self.download_asset_data(
                             run, json.dumps(summary), "wandb_summary.json"
                         )
@@ -396,7 +400,7 @@ class DownloadManager:
         self.download_file_task(path, file)
 
     def download_hyper_parameters(self, config):
-        # FIXME: may need to unpack these
+        # FIXME: may need to unpack these, wandb delim "/"
         for key, value in config.items():
             self.parameters.append(
                 {
@@ -451,16 +455,32 @@ class DownloadManager:
             "hostname": system_and_os_info["host"],
             "ip": "",
             "machine": "",
-            "osRelease": system_and_os_info["os"],
-            "osType": system_and_os_info["os"],
             "os": system_and_os_info["os"],
             "pid": 0,
             "processor": "",
             "executable": system_and_os_info["executable"],
-            "pythonVersionVerbose": system_and_os_info["python"],
             "pythonVersion": system_and_os_info["python"],
             "user": system_and_os_info["username"],
         }
+        # FIXME: add system details
+        """
+        "cpu_count": 4,
+        "cpu_count_logical": 8,
+        "cpu_freq": {
+          "current": 2513.417375,
+          "min": 400.0,
+          "max": 4000.0
+        },
+        "disk": {
+          "/": {
+            "total": 462.7395782470703,
+            "used": 284.8777313232422
+        }
+        },
+        "memory": {
+          "total": 15.332221984863281
+        }
+        """
         path = self.get_path(run, filename="system_details.json")
         with open(path, "w") as fp:
             fp.write(json.dumps(system_details) + "\n")
@@ -486,6 +506,7 @@ class DownloadManager:
         # Set the filename separately
         ## self.experiment.set_filename(system_and_os_info['program'])
         """
+        self.download_system_metrics(run, system_and_os_info)
         # Log the entire file as well:
         path = self.get_path(run, "assets", filename="wandb-metadata.json")
         with open(path, "w") as fp:
@@ -564,6 +585,21 @@ class DownloadManager:
         )
         with open(path, "w") as fp:
             fp.write(json.dumps(data_dict) + "\n")
+
+    def download_system_metrics(self, run, info):
+        # FIXME: only handle as time-series metrics here
+        """
+        "cpu_freq_per_core": [
+          {
+            "current": 2788.165,
+            "min": 400.0,
+            "max": 4000.0
+          },
+          ...
+        ]
+        """
+        # write to metrics.jsonl, but handle in parallel
+        # prefix with "sys", like sys.cpu.percent.avg
 
     def download_metric_task(self, metric, run, count):
         def task():

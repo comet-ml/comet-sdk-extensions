@@ -328,11 +328,9 @@ class CopyManager:
                 print("log_metadata...")
         if os.path.exists(filename):
             metadata = json.load(open(filename))
-            experiment.add_tags(metadata["tags"])
-            if metadata["fileName"] == "Jupyter interactive":
+            experiment.add_tags(metadata.get("tags", []))
+            if metadata.get("fileName", None):
                 experiment.set_filename(metadata["fileName"])
-            elif metadata["fileName"] is not None:
-                experiment.set_filename(os.path.join(metadata["fileName"]))
 
     def log_system_details(self, experiment, filename):
         if self.debug:
@@ -342,23 +340,21 @@ class CopyManager:
             system = json.load(open(filename))
 
             ## System info:
-            message = SystemDetailsMessage.create(
-                context=experiment.context,
-                use_http_messages=experiment.streamer.use_http_messages,
-                command=system["command"],
-                env=system["env"],
-                hostname=system["hostname"],
-                ip=system["ip"],
-                machine=system["machine"],
-                os_release=system["osRelease"],
-                os_type=system["osType"],
-                os=system["os"],
-                pid=system["pid"],
-                processor=system["processor"],
-                python_exe=system["executable"],
-                python_version_verbose=system["pythonVersionVerbose"],
-                python_version=system["pythonVersion"],
-                user=system["user"],
+            message = SystemDetailsMessage(
+                command=system.get("command", None),
+                env=system.get("env", None),
+                hostname=system.get("hostname", None),
+                ip=system.get("ip", None),
+                machine=system.get("machine", None),
+                os_release=system.get("osRelease", None),
+                os_type=system.get("osType", None),
+                os=system.get("os", None),
+                pid=system.get("pid", None),
+                processor=system.get("processor", None),
+                python_exe=system.get("executable", None),
+                python_version_verbose=system.get("pythonVersionVerbose", None),
+                python_version=system.get("pythonVersion", None),
+                user=system.get("user", None),
             )
             experiment._enqueue_message(message)
 
@@ -447,9 +443,7 @@ class CopyManager:
             installed_packages_list = [package.strip() for package in open(filename)]
             if installed_packages_list is None:
                 return
-            message = InstalledPackagesMessage.create(
-                context=experiment.context,
-                use_http_messages=experiment.streamer.use_http_messages,
+            message = InstalledPackagesMessage(
                 installed_packages=installed_packages_list,
             )
             experiment._enqueue_message(message)
@@ -466,11 +460,11 @@ class CopyManager:
                 name = dict_line["metricName"]
                 if name.startswith("sys.") and "system-metrics" in self.ignore:
                     continue
-                value = dict_line["metricValue"]
-                step = dict_line["step"]
-                epoch = dict_line["epoch"]
-                context = dict_line["runContext"]
-                timestamp = dict_line["timestamp"]
+                value = dict_line.get("metricValue", None)
+                step = dict_line.get("step", None)
+                epoch = dict_line.get("epoch", None)
+                context = dict_line.get("runContext", None)
+                timestamp = dict_line.get("timestamp", None)
                 message = MetricMessage(
                     context=context,
                     timestamp=timestamp,
@@ -526,9 +520,7 @@ class CopyManager:
                 print("log_output...")
         if os.path.exists(output_file):
             for line in open(output_file):
-                message = StandardOutputMessage.create(
-                    context=experiment.context,
-                    use_http_messages=experiment.streamer.use_http_messages,
+                message = StandardOutputMessage(
                     output=line,
                     stderr=False,
                 )
@@ -540,9 +532,7 @@ class CopyManager:
                 print("log_html...")
         if os.path.exists(filename):
             html = open(filename).read()
-            message = HtmlMessage.create(
-                context=experiment.context,
-                use_http_messages=experiment.streamer.use_http_messages,
+            message = HtmlMessage(
                 html=html,
             )
             experiment._enqueue_message(message)
@@ -553,17 +543,15 @@ class CopyManager:
                 metadata = json.load(fp)
 
             git_metadata = {
-                "parent": metadata["parent"],
+                "parent": metadata.get("parent", None),
                 "repo_name": None,
                 "status": None,
-                "user": metadata["user"],
-                "root": metadata["root"],
-                "branch": metadata["branch"],
-                "origin": metadata["origin"],
+                "user": metadata.get("user", None),
+                "root": metadata.get("root", None),
+                "branch": metadata.get("branch", None),
+                "origin": metadata.get("origin", None),
             }
-            message = GitMetadataMessage.create(
-                context=experiment.context,
-                use_http_messages=experiment.streamer.use_http_messages,
+            message = GitMetadataMessage(
                 git_metadata=git_metadata,
             )
             experiment._enqueue_message(message)
