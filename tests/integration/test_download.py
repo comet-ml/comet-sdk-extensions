@@ -22,8 +22,8 @@ from comet_ml.config import get_config
 from comet_ml.utils import proper_registry_model_name
 from mock import patch
 
-from cometx.framework.comet import DownloadManager
 from cometx.cli.download import main
+from cometx.framework.comet import DownloadManager
 
 from ..testlib import environ, until
 
@@ -289,7 +289,7 @@ class TestDownload:
             self.make_path("{dir}/{ws}/{proj}/{exp}/assets/asset/model.h5"),
             self.make_path("{dir}/{ws}/{proj}/{exp}/assets/asset/keras_module.txt"),
             # Via mock:
-            self.make_path("{dir}/{ws}/{proj}/{exp}/experiment.html"),
+            self.make_path("{dir}/{ws}/{proj}/{exp}/assets/html/experiment.html"),
             self.make_path("{dir}/{ws}/{proj}/{exp}/run/output.txt"),
             self.make_path("{dir}/{ws}/{proj}/{exp}/run/graph_definition.txt"),
         ]
