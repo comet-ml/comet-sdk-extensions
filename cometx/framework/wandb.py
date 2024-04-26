@@ -642,7 +642,11 @@ class DownloadManager:
 
     def download_metrics(self, run):
         print("    downloading metrics...")
-        samples = run.history(pandas=False, samples=1)[0]
+        history = run.history(pandas=False, samples=1)
+        if not history:
+            return
+
+        samples = history[0]
         metrics = list(samples.keys())
         metrics_summary_path = self.get_path(run, filename="metrics_summary.jsonl")
         with open(metrics_summary_path, "w") as fp:
