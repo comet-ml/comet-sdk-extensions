@@ -315,7 +315,7 @@ class DownloadManager:
                 others["Group"] = group
                 others["Run"] = "run-" + count
             else:
-                others["Group"] = run.name
+                others["Group"] = "general"
                 others["Run"] = run.name
             # Handle all of the specific run items below:
             if "metrics" not in self.ignore:

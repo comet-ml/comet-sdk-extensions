@@ -86,6 +86,12 @@ def get_parser_arguments(parser):
         "--debug", help="If given, allow debugging", default=False, action="store_true"
     )
     parser.add_argument(
+        "--quiet",
+        help="If given, don't display update info",
+        default=False,
+        action="store_true",
+    )
+    parser.add_argument(
         "--symlink",
         help="Instead of copying, create a link to an experiment in a project",
         default=False,
@@ -102,6 +108,8 @@ def copy(parsed_args, remaining=None):
             parsed_args.COMET_DESTINATION,
             parsed_args.symlink,
             parsed_args.ignore,
+            parsed_args.debug,
+            parsed_args.quiet,
         )
         if parsed_args.debug:
             print("finishing...")
@@ -130,10 +138,11 @@ class CopyManager:
         """
         self.api = API()
 
-    def copy(self, source, destination, symlink, ignore):
+    def copy(self, source, destination, symlink, ignore, debug, quiet):
         """ """
         self.ignore = ignore
-        self.debug = True
+        self.debug = debug
+        self.quiet = quiet
         self.copied_reports = False
         comet_destination = remove_extra_slashes(destination)
         comet_destination = comet_destination.split("/")
@@ -172,9 +181,13 @@ class CopyManager:
         for experiment_folder in self.get_experiment_folders(
             workspace_src, project_src, experiment_src
         ):
-            _, folder_workspace, folder_project, folder_experiment = (
-                "/" + experiment_folder
-            ).rsplit("/", 3)
+            if experiment_folder.count("/") >= 2:
+                folder_workspace, folder_project, folder_experiment = (
+                    experiment_folder
+                ).rsplit("/", 2)
+            else:
+                print("Unknown folder: %r; ignoring" % experiment_folder)
+                continue
             if folder_experiment in ["project_metadata.json"]:
                 continue
             temp_project_dst = project_dst
@@ -216,7 +229,7 @@ class CopyManager:
         Create an experiment in destination workspace
         and project, and return an Experiment.
         """
-        if self.debug:
+        if not self.quiet:
             print("Creating experiment...")
 
         ExperimentClass = OfflineExperiment if offline else Experiment
@@ -334,7 +347,7 @@ class CopyManager:
             print("ERROR: this experiment failed to copy")
 
     def log_metadata(self, experiment, filename):
-        if self.debug:
+        if not self.quiet:
             with experiment.context_manager("ignore"):
                 print("log_metadata...")
         if os.path.exists(filename):
@@ -344,7 +357,7 @@ class CopyManager:
                 experiment.set_filename(metadata["fileName"])
 
     def log_system_details(self, experiment, filename):
-        if self.debug:
+        if not self.quiet:
             with experiment.context_manager("ignore"):
                 print("log_system_details...")
         if os.path.exists(filename):
@@ -370,14 +383,14 @@ class CopyManager:
             experiment._enqueue_message(message)
 
     def log_graph(self, experiment, filename):
-        if self.debug:
+        if not self.quiet:
             with experiment.context_manager("ignore"):
                 print("log_graph...")
         if os.path.exists(filename):
             experiment.set_model_graph(open(filename).read())
 
     def log_assets(self, experiment, path, assets_metadata):
-        if self.debug:
+        if not self.quiet:
             with experiment.context_manager("ignore"):
                 print("log_assets...")
         for log_filename in assets_metadata:
@@ -434,7 +447,7 @@ class CopyManager:
 
     def log_code(self, experiment, filename):
         """ """
-        if self.debug:
+        if not self.quiet:
             with experiment.context_manager("ignore"):
                 print("log_code...")
         if os.path.exists(filename):
@@ -447,7 +460,7 @@ class CopyManager:
         """
         Requirements (pip packages)
         """
-        if self.debug:
+        if not self.quiet:
             with experiment.context_manager("ignore"):
                 print("log_requirements...")
         if os.path.exists(filename):
@@ -462,7 +475,7 @@ class CopyManager:
     def log_metrics(self, experiment, filename):
         """ """
         if os.path.exists(filename):
-            if self.debug:
+            if not self.quiet:
                 with experiment.context_manager("ignore"):
                     print("log_metrics %s..." % filename)
 
@@ -487,7 +500,7 @@ class CopyManager:
         """ """
         summary_filename = os.path.join(folder, "metrics_summary.jsonl")
         if os.path.exists(summary_filename):
-            if self.debug:
+            if not self.quiet:
                 with experiment.context_manager("ignore"):
                     print("log_metrics from %s..." % summary_filename)
 
@@ -502,7 +515,7 @@ class CopyManager:
 
     def log_parameters(self, experiment, filename):
         """ """
-        if self.debug:
+        if not self.quiet:
             with experiment.context_manager("ignore"):
                 print("log_parameters...")
         if os.path.exists(filename):
@@ -514,7 +527,7 @@ class CopyManager:
 
     def log_others(self, experiment, filename):
         """ """
-        if self.debug:
+        if not self.quiet:
             with experiment.context_manager("ignore"):
                 print("log_others...")
         if os.path.exists(filename):
@@ -526,7 +539,7 @@ class CopyManager:
 
     def log_output(self, experiment, output_file):
         """ """
-        if self.debug:
+        if not self.quiet:
             with experiment.context_manager("ignore"):
                 print("log_output...")
         if os.path.exists(output_file):
@@ -538,7 +551,7 @@ class CopyManager:
                 experiment._enqueue_message(message)
 
     def log_html(self, experiment, filename):
-        if self.debug:
+        if not self.quiet:
             with experiment.context_manager("ignore"):
                 print("log_html...")
         if os.path.exists(filename):
