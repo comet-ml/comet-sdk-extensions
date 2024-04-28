@@ -16,8 +16,8 @@ Examples:
 
 To config Comet special settings
 
-$ cometx config --log-auto-notebook yes
-$ cometx config --log-auto-notebook no
+$ cometx config --auto-log-notebook yes
+$ cometx config --auto-log-notebook no
 
 """
 import argparse
