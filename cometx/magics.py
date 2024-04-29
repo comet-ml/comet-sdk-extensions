@@ -1,6 +1,7 @@
 from IPython.core.magic import register_cell_magic
-from IPython.display import HTML, display
 
+'''
+from IPython.display import HTML, display
 display(
     HTML(
         """
@@ -14,6 +15,7 @@ display(
 """
     )
 )
+'''
 
 
 @register_cell_magic
@@ -33,36 +35,54 @@ def cometx(line, cell):
         workspace = path[0]
         project_name = path[1]
         experiment_id = path[2]
-    if "def show(" not in cell:
+    if "def main(" not in cell:
         cell = "\n".join(["    %s\n" % line for line in cell.splitlines()])
-        cell = "def show(st):\n" + cell
+        cell = """
+def main(st):
+    import comet_ml
+    from comet_ml._ui import UI
+    # Replace _st with ipywidgets
+    class UI(UI):
+        _st = st
+        session_state = st.session_state
+    comet_ml.ui = UI()
+    del UI, comet_ml, st
+    {cell}
+""".format(
+            cell=cell
+        )
     code = """
 import comet_ml
-from cometx._ui import UI
+
 class API(comet_ml.API):
-    def get_panel_experiment_names(self):
-        if not hasattr(self, "cache"):
-            if "{experiment_id}" == "":
-                self.cache = self.get_experiments("{workspace}", "{project_name}")[:100]
-            else:
-                self.cache = [self.get_experiment_by_id("{experiment_id}")]
-        return [e.name for e in self.cache]
-
+    def get_panel_project_name(self):
+        return "{project_name}"
+    def get_panel_workspace(self):
+        return "{workspace}"
     def get_panel_experiments(self):
-        if not hasattr(self, "cache"):
-            if "{experiment_id}" == "":
-                self.cache = self.get_experiments("{workspace}", "{project_name}")
-            else:
-                self.cache = [self.get_experiment_by_id("{experiment_id}")]
-        return [e.id for e in self.cache]
-
-    def get_experiment_by_name(self, experiment_name):
-        return [e for e in self.cache if e.name == experiment_name][0]
-comet_ml.ui = UI()
+        return self.get_experiments("{workspace}", "{project_name}")
+    def get_panel_experiment_keys(self):
+        return [e.id for e in self.get_panel_experiments()]
+    def get_panel_metrics_names(self):
+        return sorted(
+            [
+                name
+                for name in self._get_metrics_name(
+                    "{workspace}",
+                    "{project_name}",
+                )
+                if not name.startswith("sys.")
+            ]
+        )
+comet_ml.API = API
+del comet_ml, API
 ## User code:
 {cell}
 ## End user code
-comet_ml.ui.run(show)""".format(
+from cometx._ui import Streamlit
+st = Streamlit()
+st._run(main)
+""".format(
         cell=cell,
         workspace=workspace,
         project_name=project_name,

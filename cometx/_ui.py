@@ -1,8 +1,5 @@
-## app.py
-# import micropip
-# await micropip.install("markdown")
-
 import inspect
+import io
 
 import ipywidgets as widgets
 import markdown
@@ -17,55 +14,36 @@ class SessionState(dict):
         self[attr] = value
 
 
-class UI:
+class Streamlit:
     def __init__(self, parent=None):
-        self.response = {}
-        self.output = widgets.Output()
+        self._response = {}
+        self._output = widgets.Output()
         self.session_state = SessionState()
-        self.session_state.sidebar_index = None
         if parent is None:
-            self.make_panel()
+            self._make_panel()
         else:
-            self.parent = parent
+            self._parent = parent
 
-    def observe(self, widget, callback, names=None):
+    def _observe(self, widget, callback, names=None):
         widget.observe(callback, names=names)
 
-    def on_click(self, widget, callback):
+    def _on_click(self, widget, callback):
         widget.on_click(callback)
 
-    @property
-    def sidebar(self):
-        return self.clone(self._sidebar)
+    def _make_panel(self):
+        self._top_level = widgets.VBox()
+        self._parent = self._top_level
 
-    def make_panel(self):
-        selected_index = self.session_state.sidebar_index
-        self.top_level = widgets.HBox(
-            [
-                widgets.Accordion([widgets.VBox()], selected_index=selected_index),
-                widgets.VBox(),
-            ]
-        )
-        self._sidebar = self.top_level.children[0].children[0]
-        self.observe(
-            self.top_level.children[0], self.set_sidebar, names="_property_lock"
-        )
-        self.parent = self.top_level.children[1]
-
-    def set_sidebar(self, results):
-        self.session_state.sidebar_index = results["owner"].selected_index
-
-    def clone(self, parent):
-        app = UI(parent)
-        app.output = self.output
-        app.response = self.response
+    def _clone(self, parent):
+        app = Streamlit(parent)
+        app._output = self._output
+        app._response = self._response
         app.session_state = self.session_state
-        app.function = self.function
-        app.top_level = self.top_level
-        app._sidebar = self._sidebar
+        app._function = self._function
+        app._top_level = self._top_level
         return app
 
-    def make_key(self, widget_type, key):
+    def _make_key(self, widget_type, key):
         if key is None:
             calling_frame = inspect.getouterframes(inspect.currentframe())[2]
             key = calling_frame.lineno
@@ -74,28 +52,51 @@ class UI:
             desc = "userkey"
         return "%s-%s-%s" % (widget_type, desc, key)
 
+    def _append(self, widget):
+        self._parent.children = self._parent.children + tuple([widget])
+
+    # Widgets, replicates streamlit widgets
+
+    def pyplot(self, figure):
+        img_buf = io.BytesIO()
+        figure.savefig(img_buf, format="png")
+        img_buf.seek(0)
+        image_data = img_buf.read()
+        image = widgets.Image(
+            value=image_data,
+            format="png",
+        )
+        self._append(image)
+
+    def image(self, data):
+        # FIXME
+        pass
+
+    def write(self, data, unsafe_allow_html=False):
+        if data.__class__.__name__ == "DataFrame":
+            data = data.to_html()
+        self._append(widgets.HTML(data))
+
     def selectbox(
         self,
         label,
         options,
         index=0,
-        format_func=None,
+        format_func=str,
         key=None,
         help=None,
         on_change=None,
         args=None,
         kwargs=None,
     ):
-        key = self.make_key("selectbox", key)
+        key = self._make_key("selectbox", key)
         options = list(options)
         if len(options) == 0:
             label_options = [""]
             options = [None]
-        elif format_func is not None:
-            label_options = [format_func(option) for option in options]
-        else:
-            label_options = options
-        index = self.response.get(key, index)
+
+        label_options = [format_func(option) for option in options]
+        index = self._response.get(key, index)
         if index < len(label_options):
             value = label_options[index]
         else:
@@ -108,94 +109,91 @@ class UI:
             },
             options=label_options,
             value=value,
-            # description="<font style='color:blue;'>%s</font>:" % label,
         )
-        self.observe(
+        self._observe(
             widget,
-            lambda results: self.rerun(key, results["owner"].index, on_change, args),
+            lambda results: self._rerun(key, results["owner"].index, on_change, args),
             names="value",
         )
-        self.append(widgets.HTML("<font style='color:blue;'>%s</font>:" % label))
-        self.append(widget)
-        self.response[key] = index
+        self._append(widgets.HTML("<font style='color:blue;'>%s</font>:" % label))
+        self._append(widget)
+        self._response[key] = index
         return options[index]
 
+    def multiselect(
+        self,
+        label,
+        options,
+        default=None,
+        format_func=None,
+        key=None,
+        on_change=None,
+        args=None,
+        kwargs=None,
+    ):
+        # FIXME
+        pass
+
+    def plotly_chart(self, figure, use_container_width=False):
+        # FIXME
+        pass
+
     def button(self, label, key=None, help=None, on_click=None, args=None, kwargs=None):
-        key = self.make_key("button", key)
+        key = self._make_key("button", key)
         widget = widgets.Button(description=label)
-        self.on_click(widget, lambda value: self.rerun(key, value, on_click, args))
-        self.append(widget)
-        retval = self.response.get(key, False)
-        self.response[key] = False
+        self._on_click(widget, lambda value: self._rerun(key, value, on_click, args))
+        self._append(widget)
+        retval = self._response.get(key, False)
+        self._response[key] = False
         return retval
 
-    def title(self, body):
-        self.append(widgets.HTML(body))
+    def markdown(self, text, unsafe_allow_html=False):
+        md = (
+            """<div class="jp-RenderedHTMLCommon">"""
+            + markdown.markdown(text)
+            + """</div>"""
+        )
+        self._append(widgets.HTML(md))
 
-    def append(self, widget):
-        self.parent.children = self.parent.children + tuple([widget])
+    def text_input(
+        self, label, value, key=None, on_change=None, args=None, kwargs=None
+    ):
+        # FIXME
+        pass
 
-    def write(self, *args, color=None, **kwargs):
-        def strip(s):
-            lines = []
-            for line in s.splitlines():
-                lines.append(line.strip())
-            return "\n".join(lines).strip()
+    def checkbox(self, label, value, key=None, on_change=None, args=None, kwargs=None):
+        # FIXME
+        pass
 
-        if "raw" not in kwargs:
-            args = " ".join([strip(str(arg)) for arg in args])
-            if color is not None:
-                args = '<p style="color:{color}">{args}</p>'.format(
-                    color=color, args=args
-                )
-
-            # HTML widget surrounds items in a div with different CSS, widget-html-content
-            md = (
-                """<div class="jp-RenderedHTMLCommon">"""
-                + markdown.markdown(args)
-                + """</div>"""
-            )
-            self.append(widgets.HTML(md))
-        else:
-            self.append(widgets.HTML("".join(args)))
-
-    def success(self, *args, **kwargs):
-        self.write(*args, color="green", **kwargs)
-
-    def warning(self, *args, **kwargs):
-        self.write(*args, color="red", **kwargs)
-
-    def beta_columns(self, config):
+    def columns(self, config):
         row = widgets.HBox()
         if isinstance(config, int):
             items = config
         else:
             items = len(config)
         row.children = tuple([widgets.VBox() for i in range(items)])
-        self.append(row)
-        return [self.clone(child) for child in row.children]
+        self._append(row)
+        return [self._clone(child) for child in row.children]
 
-    def run(self, function):
-        self.function = function
-        self.execute()
+    def _run(self, function):
+        self._function = function
+        self._execute()
 
-    def rerun(self, key, value, callback, args):
-        self.response[key] = value
+    def _rerun(self, key, value, callback, args):
+        self._response[key] = value
         if callback:
             if args is None:
                 callback()
             else:
                 callback(*args)
-        self.execute()
+        self._execute()
 
-    def execute(self):
+    def _execute(self):
         clear_output(wait=True)
-        self.make_panel()
-        with self.output:
+        self._make_panel()
+        with self._output:
             clear_output(wait=True)
-            self.function(self)
-            if len(self._sidebar.children) == 0:
-                # remove sidebar, nothing in it
-                self.top_level.children = tuple([self.top_level.children[1]])
-            display(self.top_level)
-        display(self.output)
+            self._function(self)
+            # This will only actually display the first time
+            display(self._top_level)
+        display(self._output)
