@@ -3,7 +3,13 @@ import io
 
 import ipywidgets as widgets
 import markdown
-from IPython.display import clear_output, display
+from IPython.display import HTML, clear_output, display
+
+STYLE = """
+<style>
+table {width: -webkit-fill-available;}
+</style>
+"""
 
 
 class SessionState(dict):
@@ -69,13 +75,23 @@ class Streamlit:
         self._append(image)
 
     def image(self, data):
-        # FIXME
-        pass
+        # FIXME: ext, or type
+        image = widgets.Image(
+            value=data,
+        )
+        self._append(image)
 
     def write(self, data, unsafe_allow_html=False):
         if data.__class__.__name__ == "DataFrame":
-            data = data.to_html()
-        self._append(widgets.HTML(data))
+            try:
+                from ipydatagrid import DataGrid
+
+                data = DataGrid(data)
+            except ImportError:
+                data = widgets.HTML(data)
+        else:
+            data = widgets.HTML(data)
+        self._append(data)
 
     def selectbox(
         self,
@@ -115,7 +131,7 @@ class Streamlit:
             lambda results: self._rerun(key, results["owner"].index, on_change, args),
             names="value",
         )
-        self._append(widgets.HTML("<font style='color:blue;'>%s</font>:" % label))
+        self._append(widgets.HTML("<font style='color:blue;'>%s</font>" % label))
         self._append(widget)
         self._response[key] = index
         return options[index]
@@ -189,11 +205,11 @@ class Streamlit:
         self._execute()
 
     def _execute(self):
-        clear_output(wait=True)
         self._make_panel()
         with self._output:
             clear_output(wait=True)
             self._function(self)
             # This will only actually display the first time
-            display(self._top_level)
+            display(self._top_level, HTML(STYLE))
+        clear_output(wait=True)
         display(self._output)
