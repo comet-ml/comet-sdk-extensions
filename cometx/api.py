@@ -99,6 +99,18 @@ class API(API):
             )
         return results
 
+    def get_panel_code(self, workspace, panel_name):
+        """
+        Given a workspace name and panel name, get
+        the Python code.
+        """
+        panels = self.get_panels(workspace)
+        for panel in panels:
+            if panel["templateName"] == panel_name:
+                panel_data = self.get_panel(panel["templateId"])
+                if "pyCode" in panel_data["code"]:
+                    return panel_data["code"]["pyCode"]
+
     def download_panel_zip(self, template_id, filename=None):
         """
         Download a panel zip file.

@@ -1,3 +1,16 @@
+# -*- coding: utf-8 -*-
+# ****************************************
+#                              __
+#   _________  ____ ___  ___  / /__  __
+#  / ___/ __ \/ __ `__ \/ _ \/ __/ |/_/
+# / /__/ /_/ / / / / / /  __/ /__>  <
+# \___/\____/_/ /_/ /_/\___/\__/_/|_|
+#
+#
+#  Copyright (c) 2024 Cometx Development
+#      Team. All rights reserved.
+# ****************************************
+
 from IPython.core.magic import register_cell_magic
 
 
@@ -54,7 +67,7 @@ def main(st):
         _st = st
         session_state = st.session_state
     comet_ml.ui = UI()
-    del UI, comet_ml, st
+    del UI, comet_ml, st, API
     {cell}
 """.format(
             cell=cell,

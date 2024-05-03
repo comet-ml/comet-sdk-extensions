@@ -1,5 +1,19 @@
+# -*- coding: utf-8 -*-
+# ****************************************
+#                              __
+#   _________  ____ ___  ___  / /__  __
+#  / ___/ __ \/ __ `__ \/ _ \/ __/ |/_/
+# / /__/ /_/ / / / / / /  __/ /__>  <
+# \___/\____/_/ /_/ /_/\___/\__/_/|_|
+#
+#
+#  Copyright (c) 2024 Cometx Development
+#      Team. All rights reserved.
+# ****************************************
+
 import inspect
 import io
+import traceback
 
 import ipywidgets as widgets
 import markdown
@@ -8,6 +22,10 @@ from IPython.display import HTML, clear_output, display
 STYLE = """
 <style>
 table {width: -webkit-fill-available;}
+.widget-image, .jupyter-widget-image {
+    max-width: 800px;
+    height: auto;
+}
 </style>
 """
 
@@ -51,7 +69,7 @@ class Streamlit:
 
     def _make_key(self, widget_type, key):
         if key is None:
-            calling_frame = inspect.getouterframes(inspect.currentframe())[2]
+            calling_frame = inspect.getouterframes(inspect.currentframe())[3]
             key = calling_frame.lineno
             desc = "lineno"
         else:
@@ -60,6 +78,9 @@ class Streamlit:
 
     def _append(self, widget):
         self._parent.children = self._parent.children + tuple([widget])
+
+    def _clear(self):
+        self._parent.children = tuple()
 
     # Widgets, replicates streamlit widgets
 
@@ -208,7 +229,14 @@ class Streamlit:
         self._make_panel()
         with self._output:
             clear_output(wait=True)
-            self._function(self)
+            try:
+                self._function(self)
+            except Exception as exc:
+                traceback_str = "".join(traceback.format_tb(exc.__traceback__))
+                self._clear()
+                self.markdown(
+                    f'<pre style="background-color:#fdd;">{traceback_str}</pre>'
+                )
             # This will only actually display the first time
             display(self._top_level, HTML(STYLE))
         clear_output(wait=True)
