@@ -69,6 +69,9 @@ def main(st):
     comet_ml.ui = UI()
     del UI, comet_ml, st, API
     {cell}
+    import comet_ml
+    cols = comet_ml.ui.columns(2)
+    cols[-1].button("Deploy to Comet...")
 """.format(
             cell=cell,
             workspace=workspace,

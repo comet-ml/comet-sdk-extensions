@@ -21,9 +21,21 @@ from IPython.display import HTML, clear_output, display
 
 STYLE = """
 <style>
-table {width: -webkit-fill-available;}
+button.lm-Widget.jupyter-widgets.jupyter-button.widget-button {
+    width: fit-content;
+}
+.widget-dropdown > select {
+    background-color: rgb(240, 242, 246);
+}
+.widget-dropdown, .jupyter-widget-dropdown {
+    max-width: 600px;
+    width: 90%;
+}
+table {
+    width: -webkit-fill-available;
+}
 .widget-image, .jupyter-widget-image {
-    max-width: 800px;
+    max-width: 600px;
     height: auto;
 }
 </style>
@@ -111,7 +123,7 @@ class Streamlit:
             except ImportError:
                 data = widgets.HTML(data)
         else:
-            data = widgets.HTML(data)
+            data = widgets.HTML(str(data))
         self._append(data)
 
     def selectbox(
@@ -152,7 +164,7 @@ class Streamlit:
             lambda results: self._rerun(key, results["owner"].index, on_change, args),
             names="value",
         )
-        self._append(widgets.HTML("<font style='color:blue;'>%s</font>" % label))
+        self._append(widgets.HTML(label))
         self._append(widget)
         self._response[key] = index
         return options[index]
@@ -206,9 +218,16 @@ class Streamlit:
         row = widgets.HBox()
         if isinstance(config, int):
             items = config
+            widths = [(1 / items) * 100] * items
         else:
             items = len(config)
-        row.children = tuple([widgets.VBox() for i in range(items)])
+            widths = [((i / sum(config)) * 100) for i in config]
+        row.children = tuple(
+            [
+                widgets.VBox(layout=widgets.Layout(width=f"{widths[i]}%"))
+                for i in range(items)
+            ]
+        )
         self._append(row)
         return [self._clone(child) for child in row.children]
 
@@ -231,8 +250,8 @@ class Streamlit:
             clear_output(wait=True)
             try:
                 self._function(self)
-            except Exception as exc:
-                traceback_str = "".join(traceback.format_tb(exc.__traceback__))
+            except Exception:
+                traceback_str = traceback.format_exc()
                 self._clear()
                 self.markdown(
                     f'<pre style="background-color:#fdd;">{traceback_str}</pre>'
