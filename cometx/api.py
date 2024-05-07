@@ -41,6 +41,20 @@ class API(API):
         )
         return results["codePanelTemplateRows"]
 
+    def get_python_panels(self, workspace):
+        templates = self.get_panels(workspace)
+        results = []
+        for template in templates:
+            template_data = self.get_panel(template["templateId"])
+            if (
+                "code" in template_data
+                and "type" in template_data["code"]
+                and template_data["code"]["type"] == "py"
+            ):
+                template["code"] = template_data["code"]["pyCode"]
+                results.append(template)
+        return results
+
     def get_panel(self, template_id=None, instance_id=None):
         """
         Get a panel JSON given a panel's instance or template id.

@@ -11,11 +11,29 @@
 #      Team. All rights reserved.
 # ****************************************
 
-from IPython.core.magic import register_cell_magic
+from IPython.core.magic import register_cell_magic, register_line_magic
+
+
+def remove_quotes(text):
+    if text[0] == text[-1] == "'":
+        return text[1:-1]
+    elif text[0] == text[-1] == '"':
+        return text[1:-1]
+    return text
 
 
 @register_cell_magic
-def cometx(line, cell):
+@register_line_magic
+def cometx(line, cell=None):
+    # workspace/project
+    # workspace/project/experiment
+    # workspace/project "Panel Name"
+
+    if " " in line.strip():
+        line, panel_name = line.split(" ", 1)
+    else:
+        panel_name = None
+
     path = line.split("/")
     if len(path) == 2:
         workspace = path[0]
@@ -29,6 +47,33 @@ def cometx(line, cell):
         raise Exception(
             "Need to provide WORKSPACE/PROJECT or WORKSPACE/PROJECT/EXPERIMENT to %%cometx"
         )
+
+    if cell is None:
+        if panel_name is None:
+            cell = """
+from cometx import API
+from comet_ml import ui
+import datetime
+api = API()
+templates = api.get_python_panels("{workspace}")
+selected = ui.dropdown(
+            "Python Panels:", templates,
+            format_func=lambda item: "%s - %s" % (item["templateName"], datetime.datetime.fromtimestamp(item["revisionId"] / 1000)))
+if selected:
+    ui.display_markdown("<pre>" + selected["code"] + "</pre>")
+    ui.display_markdown("To edit and run here: **%%cometx {line} %r**" % selected["templateName"])
+""".format(
+                workspace=workspace, line=line
+            )
+        else:
+            panel_name = remove_quotes(panel_name)
+            from cometx import API
+
+            api = API()
+            contents = api.get_panel_code(workspace, panel_name)
+            contents = (f"%%cometx {line}\n\n") + contents
+            get_ipython().set_next_input(contents, replace=True)
+            return
 
     if "def main(" not in cell:
         cell = "\n".join(["    %s\n" % line for line in cell.splitlines()])
