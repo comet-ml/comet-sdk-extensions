@@ -20,11 +20,9 @@ from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import unquote
 
 import comet_ml
+import wandb
 from comet_ml.cli_args_parse import _parse_cmd_args, _parse_cmd_args_naive
 from comet_ml.data_structure import Histogram
-from comet_ml.utils import makedirs
-
-import wandb
 
 from ..utils import download_url, remove_extra_slashes
 
@@ -116,7 +114,7 @@ class DownloadManager:
         else:
             workspace, project, experiment = run.path
             path = os.path.join(self.root, workspace, project, experiment, *subdirs)
-        makedirs(path, exist_ok=True)
+        os.makedirs(path, exist_ok=True)
         if filename:
             path = os.path.join(path, filename)
             # Add to asset metadata:
@@ -542,7 +540,7 @@ class DownloadManager:
         else:
             path = os.path.join(self.root, workspace, project, "artifacts")
 
-        makedirs(path, exist_ok=True)
+        os.makedirs(path, exist_ok=True)
         artifact = self.api.artifact(f"{workspace}/{project}/{artifact_name}:{alias}")
         artifact.download(path)
 
@@ -672,7 +670,7 @@ class DownloadManager:
         else:
             path = os.path.join(self.root, workspace, project, "reports")
 
-        makedirs(path, exist_ok=True)
+        os.makedirs(path, exist_ok=True)
         wandb_path = workspace + "/" + project
         reports = self.api.reports(path=wandb_path)
         for report in reports:

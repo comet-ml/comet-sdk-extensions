@@ -16,8 +16,6 @@ import argparse
 import os
 import sys
 
-from comet_ml.utils import makedirs
-
 from cometx.framework.comet.download_manager import DownloadManager, clean_comet_path
 
 ADDITIONAL_ARGS = False
@@ -82,7 +80,7 @@ def reproduce(parsed_args, remaining=None):
             "invalid experiment: %r; not found, or not available" % comet_path
         )
 
-    makedirs(parsed_args.OUTPUT_DIR, exist_ok=True)
+    os.makedirs(parsed_args.OUTPUT_DIR, exist_ok=True)
     manager.download_code(experiment)
     manager.download_git(experiment)
     manager.download_requirements(experiment)

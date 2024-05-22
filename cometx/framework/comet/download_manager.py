@@ -32,7 +32,6 @@ from comet_ml.api import API, APIExperiment
 from comet_ml.artifacts import _get_artifact
 from comet_ml.config import get_config
 from comet_ml.summary import Summary
-from comet_ml.utils import makedirs
 
 from ..._typing import Any, List, Optional
 from ..._version import __version__
@@ -662,7 +661,7 @@ class DownloadManager:
             graph = experiment.get_model_graph()
             if graph:
                 self.summary["graph"] += 1
-                makedirs(path, exist_ok=True)
+                os.makedirs(path, exist_ok=True)
                 with open(filepath, "w") as f:
                     f.write(graph)
 
@@ -767,7 +766,7 @@ class DownloadManager:
             metadata["tags"] = experiment.get_tags()
             metadata["cometDownloadVersion"] = __version__
             self.summary["metadata"] += 1
-            makedirs(path, exist_ok=True)
+            os.makedirs(path, exist_ok=True)
             with open(filepath, "w") as f:
                 f.write(json.dumps(metadata))
 
@@ -789,7 +788,7 @@ class DownloadManager:
             html = experiment.get_html()
             if html:
                 self.summary["html"] += 1
-                makedirs(path, exist_ok=True)
+                os.makedirs(path, exist_ok=True)
                 with open(filepath, "w") as f:
                     f.write(html)
 
@@ -811,7 +810,7 @@ class DownloadManager:
             metrics = experiment.get_metrics()
             if metrics:
                 self.summary["metrics"] += 1
-                makedirs(path, exist_ok=True)
+                os.makedirs(path, exist_ok=True)
                 with open(filepath, "w") as f:
                     for metric in metrics:
                         f.write(json.dumps(metric))
@@ -840,7 +839,7 @@ class DownloadManager:
                 os_packages = details["osPackages"]
             if os_packages:
                 self.summary["requirements"] += 1
-                makedirs(path, exist_ok=True)
+                os.makedirs(path, exist_ok=True)
                 with open(filepath, "w") as f:
                     f.write("\n".join(os_packages))
 
@@ -865,7 +864,7 @@ class DownloadManager:
             if "installedPackages" in details:
                 del details["installedPackages"]
             self.summary["system"] += 1
-            makedirs(path, exist_ok=True)
+            os.makedirs(path, exist_ok=True)
             with open(filepath, "w") as f:
                 f.write(json.dumps(details))
 
@@ -886,7 +885,7 @@ class DownloadManager:
         if self._should_write(filepath):
             others = experiment.get_others_summary()
             self.summary["others"] += 1
-            makedirs(path, exist_ok=True)
+            os.makedirs(path, exist_ok=True)
             with open(filepath, "w") as f:
                 for other in others:
                     f.write(json.dumps(other))
@@ -909,7 +908,7 @@ class DownloadManager:
         if self._should_write(filepath):
             params = experiment.get_parameters_summary()
             self.summary["parameters"] += 1
-            makedirs(path, exist_ok=True)
+            os.makedirs(path, exist_ok=True)
             with open(filepath, "w") as f:
                 f.write(json.dumps(params))
 
@@ -943,7 +942,7 @@ class DownloadManager:
             git_meta_loaded = True
             if git_meta and any(git_meta.values()):
                 self.summary["git"] += 1
-                makedirs(path, exist_ok=True)
+                os.makedirs(path, exist_ok=True)
                 with open(filepath, "w") as f:
                     f.write(json.dumps(git_meta))
 
@@ -967,7 +966,7 @@ class DownloadManager:
                     # Early days, wasn't zip encoded
                     patch_contents = bytes(git_patch, encoding="utf8")
                 self.summary["git"] += 1
-                makedirs(path, exist_ok=True)
+                os.makedirs(path, exist_ok=True)
                 with open(filepath, "wb") as f:
                     f.write(patch_contents)
 
@@ -1059,7 +1058,7 @@ class DownloadManager:
             code = experiment.get_code()
             if code:
                 self.summary["code"] += 1
-                makedirs(path, exist_ok=True)
+                os.makedirs(path, exist_ok=True)
                 with open(filepath, "w") as f:
                     f.write(code)
 
@@ -1081,7 +1080,7 @@ class DownloadManager:
             output = experiment.get_output()
             if output:
                 self.summary["output"] += 1
-                makedirs(path, exist_ok=True)
+                os.makedirs(path, exist_ok=True)
                 with open(filepath, "w") as f:
                     f.write(output)
 
@@ -1125,7 +1124,7 @@ class DownloadManager:
             filepath = os.path.join(assets_path, filename)
             if self._should_write(filepath):
                 self.summary["assets"] += 1
-                makedirs(assets_path, exist_ok=True)
+                os.makedirs(assets_path, exist_ok=True)
                 with open(filepath, "w") as f:
                     for asset in assets:
                         f.write(json.dumps(asset))
@@ -1145,7 +1144,7 @@ class DownloadManager:
                 filenames.add(file_path)
                 self.summary["assets"] += 1
                 path, filename = os.path.split(file_path)
-                makedirs(path, exist_ok=True)
+                os.makedirs(path, exist_ok=True)
                 self.submit_task(file_path, experiment, "get_asset", [asset["assetId"]])
 
     def download_asset(self, experiment, asset_filename):
@@ -1177,7 +1176,7 @@ class DownloadManager:
                 if self._should_write(file_path):
                     self.summary["assets"] += 1
                     path, filename = os.path.split(file_path)
-                    makedirs(path, exist_ok=True)
+                    os.makedirs(path, exist_ok=True)
                     raw = experiment.get_asset(asset["assetId"])
                     with open(file_path, "wb+") as f:
                         f.write(raw)
@@ -1240,7 +1239,7 @@ class DownloadManager:
         filepath = os.path.join(path, "project_metadata.json")
         if self._should_write(filepath) and "project_metadata" in self.include:
             self.summary["project_metadata"] += 1
-            makedirs(path, exist_ok=True)
+            os.makedirs(path, exist_ok=True)
             with open(filepath, "w") as f:
                 f.write(json.dumps(project_metadata))
 
@@ -1249,7 +1248,7 @@ class DownloadManager:
             notes = self.api.get_project_notes(workspace, project_name)
             if notes:
                 self.summary["project_notes"] += 1
-                makedirs(path, exist_ok=True)
+                os.makedirs(path, exist_ok=True)
                 with open(filepath, "w") as f:
                     f.write(notes)
 
