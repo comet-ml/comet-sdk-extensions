@@ -11,7 +11,11 @@
 #      Team. All rights reserved.
 # ****************************************
 
+from collections import defaultdict
+
 from comet_ml import API
+
+CACHE = defaultdict(dict)
 
 
 class API(API):
@@ -42,18 +46,20 @@ class API(API):
         return results["codePanelTemplateRows"]
 
     def get_python_panels(self, workspace):
-        templates = self.get_panels(workspace)
-        results = []
-        for template in templates:
-            template_data = self.get_panel(template["templateId"])
-            if (
-                "code" in template_data
-                and "type" in template_data["code"]
-                and template_data["code"]["type"] == "py"
-            ):
-                template["code"] = template_data["code"]["pyCode"]
-                results.append(template)
-        return results
+        if workspace not in CACHE["get_python_panels"]:
+            templates = self.get_panels(workspace)
+            results = []
+            for template in templates:
+                template_data = self.get_panel(template["templateId"])
+                if (
+                    "code" in template_data
+                    and "type" in template_data["code"]
+                    and template_data["code"]["type"] == "py"
+                ):
+                    template["code"] = template_data["code"]["pyCode"]
+                    results.append(template)
+            CACHE["get_python_panels"][workspace] = results
+        return CACHE["get_python_panels"][workspace]
 
     def get_panel(self, template_id=None, instance_id=None):
         """

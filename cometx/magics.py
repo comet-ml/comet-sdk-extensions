@@ -12,6 +12,7 @@
 # ****************************************
 
 from IPython.core.magic import register_cell_magic, register_line_magic
+from IPython.display import display
 
 
 def remove_quotes(text):
@@ -50,6 +51,7 @@ def cometx(line, cell=None):
 
     if cell is None:
         if panel_name is None:
+            display("Loading Python Panels...")
             cell = """
 from cometx import API
 from comet_ml import ui
