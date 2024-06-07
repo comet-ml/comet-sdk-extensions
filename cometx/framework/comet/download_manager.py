@@ -1126,6 +1126,19 @@ class DownloadManager:
                 os.makedirs(assets_path, exist_ok=True)
                 with open(filepath, "w") as f:
                     for asset in assets:
+                        if asset["type"] == "audio" and asset["step"] is not None:
+                            asset_filename = asset["fileName"]
+                            asset["logAsFileName"] = asset_filename
+                            if "." in asset_filename:
+                                asset_filename, ext = asset_filename.split(".", 1)
+                            else:
+                                asset_filename, ext = asset_filename, ""
+                            asset_filename = "%s-%s.%s" % (
+                                asset_filename,
+                                asset["step"],
+                                ext,
+                            )
+                            asset["fileName"] = asset_filename
                         f.write(json.dumps(asset))
                         f.write("\n")
 
@@ -1137,13 +1150,6 @@ class DownloadManager:
             else:
                 path = os.path.join(assets_path, asset_type)
             filename = sanitize_filename(asset["fileName"])
-            if asset["type"] == "audio" and asset["step"] is not None:
-                if "." in filename:
-                    filename, ext = filename.split(".", 1)
-                else:
-                    filename, ext = filename, ""
-                filename = "%s-%s.%s" % (filename, asset["step"], ext)
-
             file_path = os.path.join(path, filename)
             # Don't download a filename more than once:
             if file_path not in filenames and self._should_write(file_path):
