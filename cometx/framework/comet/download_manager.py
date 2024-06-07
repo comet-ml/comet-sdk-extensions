@@ -28,12 +28,11 @@ try:
 except ImportError:
     from cometx.utils import ProgressBar
 
-from comet_ml.api import API, APIExperiment
+from comet_ml.api import API
 from comet_ml.artifacts import _get_artifact
 from comet_ml.config import get_config
 from comet_ml.summary import Summary
 
-from ..._typing import Any, List, Optional
 from ..._version import __version__
 from ...utils import _input_user_yn, get_query_experiments
 
@@ -1138,6 +1137,13 @@ class DownloadManager:
             else:
                 path = os.path.join(assets_path, asset_type)
             filename = sanitize_filename(asset["fileName"])
+            if asset["type"] == "audio" and asset["step"] is not None:
+                if "." in filename:
+                    filename, ext = filename.split(".", 1)
+                else:
+                    filename, ext = filename, ""
+                filename = "%s-%s.%s" % (filename, asset["step"], ext)
+
             file_path = os.path.join(path, filename)
             # Don't download a filename more than once:
             if file_path not in filenames and self._should_write(file_path):
