@@ -20,9 +20,10 @@ from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import unquote
 
 import comet_ml
-import wandb
 from comet_ml.cli_args_parse import _parse_cmd_args, _parse_cmd_args_naive
 from comet_ml.data_structure import Histogram
+
+import wandb
 
 from ..utils import download_url, remove_extra_slashes
 
@@ -364,7 +365,7 @@ class DownloadManager:
                             run, json.dumps(summary), "wandb_summary.json"
                         )
                 elif name == "wandb-metadata.json":
-                    ## System info etc
+                    # System info etc
                     self.download_system_details(run, file, workspace, project)
                 elif name == "diff.patch" and "git" not in self.ignore:
                     self.download_git_patch(run, file)
@@ -597,7 +598,7 @@ class DownloadManager:
         ]
         """
         # write to metrics.jsonl, but handle in parallel
-        # prefix with "sys", like sys.cpu.percent.avg
+        # info:
 
     def download_metric_task(self, metric, run, count):
         def task():
@@ -642,13 +643,48 @@ class DownloadManager:
         print("    downloading metrics...")
         history = run.history(pandas=False, samples=1)
         if not history:
-            return
+            metrics = []
+        else:
+            samples = history[0]
+            metrics = list(samples.keys())
 
-        samples = history[0]
-        metrics = list(samples.keys())
         metrics_summary_path = self.get_path(run, filename="metrics_summary.jsonl")
+
+        count = 0
         with open(metrics_summary_path, "w") as fp:
-            for count, metric in enumerate(metrics):
+            # First, log system metrics:
+            # 'gpu_devices': [{'name': 'NVIDIA L4', 'memory_total': 24152899584},
+            #                 {'name': 'NVIDIA L4', 'memory_total': 24152899584},
+            # system: /gpu.0.memoryAllocatedBytes, gpu.1.memoryAllocatedBytes, Process GPU Power Usage (W)
+            # if "gpu_devices" in
+            # First, log single-value from summary:
+            timestamp = None
+            for item in run.summary.keys():
+                if item == "_timestamp":
+                    timestamp = run.summary["_timestamp"]
+            for item in run.summary.keys():
+                if item.startswith("_"):
+                    continue
+
+                fp.write(json.dumps({"metric": item, "count": count}) + "\n")
+                filename = self.get_path(
+                    run, "metrics", filename="metric_%05d.jsonl" % count
+                )
+                with open(filename, "w") as metric_fp:
+                    print("        downloading summary metric %r..." % item)
+                    ts = int(timestamp * 1000) if timestamp is not None else None
+                    data = {
+                        "metricName": item,
+                        "metricValue": run.summary[item],
+                        "timestamp": ts,
+                        "step": None,
+                        "epoch": None,
+                        "runContext": None,
+                    }
+                    metric_fp.write(json.dumps(data) + "\n")
+                count += 1
+
+            for metric in metrics:
                 if self.ignore_metric_name(metric):
                     continue
                 # Is it a metric?
@@ -663,6 +699,7 @@ class DownloadManager:
                     continue
                 fp.write(json.dumps({"metric": metric, "count": count}) + "\n")
                 self.download_metric_task(metric, run, count)
+                count += 1
 
     def download_reports(self, workspace, project):
         if self.flat:
