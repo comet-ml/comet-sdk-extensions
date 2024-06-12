@@ -443,6 +443,7 @@ class DownloadManager:
     def download_system_details(self, run, file, workspace, project):
         with tempfile.TemporaryDirectory() as tmpdirname:
             system_and_os_info = json.load(file.download(root=tmpdirname))
+
         args = system_and_os_info["args"]
         system_details = {
             "command": (
@@ -505,7 +506,6 @@ class DownloadManager:
         # Set the filename separately
         ## self.experiment.set_filename(system_and_os_info['program'])
         """
-        self.download_system_metrics(run, system_and_os_info)
         # Log the entire file as well:
         path = self.get_path(run, "assets", filename="wandb-metadata.json")
         with open(path, "w") as fp:
@@ -585,21 +585,6 @@ class DownloadManager:
         with open(path, "w") as fp:
             fp.write(json.dumps(data_dict) + "\n")
 
-    def download_system_metrics(self, run, info):
-        # FIXME: only handle as time-series metrics here
-        """
-        "cpu_freq_per_core": [
-          {
-            "current": 2788.165,
-            "min": 400.0,
-            "max": 4000.0
-          },
-          ...
-        ]
-        """
-        # write to metrics.jsonl, but handle in parallel
-        # info:
-
     def download_metric_task(self, metric, run, count):
         def task():
             print("        downloading metric %r..." % metric)
@@ -652,12 +637,44 @@ class DownloadManager:
 
         count = 0
         with open(metrics_summary_path, "w") as fp:
-            # First, log system metrics:
-            # 'gpu_devices': [{'name': 'NVIDIA L4', 'memory_total': 24152899584},
-            #                 {'name': 'NVIDIA L4', 'memory_total': 24152899584},
-            # system: /gpu.0.memoryAllocatedBytes, gpu.1.memoryAllocatedBytes, Process GPU Power Usage (W)
-            # if "gpu_devices" in
-            # First, log single-value from summary:
+            system_metrics = run.history(stream="events", pandas=False)
+            system_metric_names = set()
+            for line in system_metrics:
+                for key in line.keys():
+                    if key.startswith("_"):
+                        continue
+                    system_metric_names.add(key)
+
+            for system_metric_name in system_metric_names:
+                fp.write(
+                    json.dumps({"metric": system_metric_name, "count": count}) + "\n"
+                )
+                filename = self.get_path(
+                    run, "metrics", filename="metric_%05d.jsonl" % count
+                )
+                with open(filename, "w") as metric_fp:
+                    name = (
+                        system_metric_name.replace("system.", "system/")
+                        if system_metric_name.startswith("system.")
+                        else system_metric_name
+                    )
+                    name = name.replace("\\.", "")
+                    print("        downloading summary metric %r..." % name)
+                    for line in system_metrics:
+                        timestamp = line["_timestamp"]
+                        ts = int(timestamp * 1000) if timestamp is not None else None
+                        data = {
+                            "metricName": name,
+                            "metricValue": line.get(system_metric_name),
+                            "timestamp": ts,
+                            "step": None,
+                            "epoch": None,
+                            "runContext": None,
+                        }
+                        metric_fp.write(json.dumps(data) + "\n")
+                count += 1
+
+            # Next, log single-value from summary:
             timestamp = None
             for item in run.summary.keys():
                 if item == "_timestamp":
