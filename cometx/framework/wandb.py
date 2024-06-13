@@ -109,7 +109,7 @@ class DownloadManager:
             #    self.download_reports(workspace, project)
             self.download_runs(workspace, project)
 
-    def get_path(self, run, *subdirs, filename=None):
+    def get_path(self, run, *subdirs, filename):
         if self.flat:
             path = self.root
         else:
@@ -120,9 +120,9 @@ class DownloadManager:
             path = os.path.join(path, filename)
             # Add to asset metadata:
             if (
-                len(subdirs) > 1
+                filename != "assets_metadata.jsonl"
+                and len(subdirs) > 1
                 and subdirs[0] == "assets"
-                and subdirs[1] != "assets_metadata.jsonl"
             ):
                 step = None
                 log_as_filename = None
@@ -320,7 +320,6 @@ class DownloadManager:
             if "metrics" not in self.ignore:
                 self.download_metrics(run)
 
-            # Handle assets (things that have a filename) here:
             for file in list(run.files()):
                 path = self.get_file_path(file)
                 name = file.name
@@ -390,9 +389,9 @@ class DownloadManager:
 
             # After all of the file downloads, log others:
             self.download_others(run, others)
-            self.download_asset_metadata(run)
             self.download_hyper_parameters(run.config)
             self.write_parameters(run)
+            self.download_asset_metadata(run)
 
     def download_git_patch(self, run, file):
         path = self.get_path(run, "run", filename="git_diff.patch")
@@ -507,7 +506,7 @@ class DownloadManager:
         ## self.experiment.set_filename(system_and_os_info['program'])
         """
         # Log the entire file as well:
-        path = self.get_path(run, "assets", filename="wandb-metadata.json")
+        path = self.get_path(run, "assets", "asset", filename="wandb-metadata.json")
         with open(path, "w") as fp:
             fp.write(json.dumps(system_and_os_info) + "\n")
 
@@ -660,14 +659,14 @@ class DownloadManager:
                     )
                     name = name.replace("\\.", "")
                     print("        downloading summary metric %r..." % name)
-                    for line in system_metrics:
+                    for step, line in enumerate(system_metrics):
                         timestamp = line["_timestamp"]
                         ts = int(timestamp * 1000) if timestamp is not None else None
                         data = {
                             "metricName": name,
                             "metricValue": line.get(system_metric_name),
                             "timestamp": ts,
-                            "step": None,
+                            "step": step + 1,
                             "epoch": None,
                             "runContext": None,
                         }
