@@ -35,6 +35,30 @@ Not all combinations are possible:
 | WORKSPACE          | Copies all projects  | N/A                    |
 | WORKSPACE/PROJ     | N/A                  | Copies all experiments |
 | WORKSPACE/PROJ/EXP | N/A                  | Copies experiment      |
+
+Asset types:
+
+* 3d-image
+* 3d-points - deprecated
+* audio
+* confusion-matrix - may contain assets
+* curve
+* dataframe
+* dataframe-profile
+* datagrid
+* embeddings - may reference image asset
+* histogram2d - not used
+* histogram3d - internal only, single histogram, partial logging
+* histogram_combined_3d
+* image
+* llm_data
+* model-element
+* notebook
+* source_code
+* tensorflow-model-graph-text - not used
+* text-sample
+* video
+
 """
 
 import argparse
@@ -363,7 +387,7 @@ class CopyManager:
         if os.path.exists(filename):
             system = json.load(open(filename))
 
-            ## System info:
+            # System info:
             message = SystemDetailsMessage(
                 command=system.get("command", None),
                 env=system.get("env", None),
@@ -389,61 +413,140 @@ class CopyManager:
         if os.path.exists(filename):
             experiment.set_model_graph(open(filename).read())
 
+    def _log_asset_filename(
+        self, experiment, asset_type, metadata, filename, step, log_filename
+    ):
+        binary_io = open(filename, "rb")
+        result = experiment._log_asset(
+            binary_io,
+            file_name=log_filename,
+            copy_to_tmp=True,
+            asset_type=asset_type,
+            metadata=metadata,
+            step=step,
+        )  # done!
+        return result
+
+    def _log_asset(
+        self, experiment, path, asset_type, log_filename, assets_metadata, asset_map
+    ):
+        log_as_filename = assets_metadata[log_filename].get(
+            "logAsFileName",
+            None,
+        )
+        step = assets_metadata[log_filename].get("step")
+        epoch = assets_metadata[log_filename].get("epoch")
+        old_asset_id = assets_metadata[log_filename].get("assetId")
+        if asset_type in self.ignore:
+            return
+        if log_filename.startswith("/"):
+            filename = os.path.join(path, asset_type, log_filename[1:])
+        else:
+            filename = os.path.join(path, asset_type, log_filename)
+
+        filename = filename.replace(":", "-")
+
+        if not os.path.isfile(filename):
+            with experiment.context_manager("ignore"):
+                print("Missing file %r: unable to copy" % filename)
+            return
+
+        metadata = assets_metadata[log_filename].get("metadata")
+        metadata = json.loads(metadata) if metadata else {}
+
+        if asset_type == "notebook":
+            result = experiment.log_notebook(filename)  # done!
+            asset_map[old_asset_id] = result["assetId"]
+        elif asset_type == "embedding":
+            # This will come after contained assets
+            # FIXME, open and replace, then:
+            result = self._log_asset_filename(
+                experiment,
+                asset_type,
+                metadata,
+                filename,
+                step,
+                log_as_filename or log_filename,
+            )
+            asset_map[old_asset_id] = result["assetId"]
+        elif asset_type == "confusion-matrix":
+            # This will come after contained assets
+            with open(filename) as fp:
+                cm_json = json.load(fp)
+            # go though JSON, replace asset_ids with new asset_ids
+            for row in cm_json["sampleMatrix"]:
+                if row:
+                    for cols in row:
+                        if cols:
+                            for cell in cols:
+                                if cell:
+                                    old_cell_asset_id = cell["assetId"]
+                                    new_cell_asset_id = asset_map[old_cell_asset_id]
+                                    cell["assetId"] = new_cell_asset_id
+
+            with open(filename, "w") as fp:
+                json.dump(cm_json, fp)
+            result = self._log_asset_filename(
+                experiment,
+                asset_type,
+                metadata,
+                filename,
+                step,
+                log_as_filename or log_filename,
+            )
+            asset_map[old_asset_id] = result["assetId"]
+        elif asset_type == "video":
+            name = os.path.basename(filename)
+            binary_io = open(filename, "rb")
+            result = experiment.log_video(
+                binary_io, name=log_as_filename or name, step=step, epoch=epoch
+            )  # done!
+            asset_map[old_asset_id] = result["assetId"]
+        elif asset_type == "model-element":
+            name = os.path.basename(filename)
+            result = experiment.log_model(name, filename)
+            asset_map[old_asset_id] = result["assetId"]
+        else:
+            result = self._log_asset_filename(
+                experiment,
+                asset_type,
+                metadata,
+                filename,
+                step,
+                log_as_filename or log_filename,
+            )
+            asset_map[old_asset_id] = result["assetId"]
+
     def log_assets(self, experiment, path, assets_metadata):
         if not self.quiet:
             with experiment.context_manager("ignore"):
                 print("log_assets...")
+        # Create mapping from old asset id to new asset id
+        asset_map = {}
+        # Process all of the non-nested assets first:
         for log_filename in assets_metadata:
-            log_as_filename = assets_metadata[log_filename].get(
-                "logAsFileName",
-                None,
-            )
-            step = assets_metadata[log_filename].get("step", None)
-            epoch = assets_metadata[log_filename].get("epoch", None)
-            asset_type = assets_metadata[log_filename].get("type", None)
-            asset_type = asset_type if asset_type else "asset"
-            if asset_type in self.ignore:
-                continue
-            if log_filename.startswith("/"):
-                filename = os.path.join(path, asset_type, log_filename[1:])
-            else:
-                filename = os.path.join(path, asset_type, log_filename)
-
-            if not os.path.isfile(filename):
-                with experiment.context_manager("ignore"):
-                    print("Missing file %r: unable to copy" % filename)
-                continue
-
-            metadata = assets_metadata[log_filename].get("metadata")
-            metadata = json.loads(metadata) if metadata else {}
-
-            if asset_type == "notebook":
-                experiment.log_notebook(filename)  # done!
-            elif asset_type == "video":
-                name = os.path.basename(filename)
-                binary_io = open(filename, "rb")
-
-                experiment.log_video(
-                    binary_io, name=log_as_filename or name, step=step, epoch=epoch
-                )  # done!
-                # FIXME:
-                # TODO: what to do about assets referenced in confusion matrix?
-                # elif asset_type == "embedding":
-                # TODO: what to do about assets referenced in embedding?
-            elif asset_type == "model-element":
-                name = os.path.basename(filename)
-                experiment.log_model(name, filename)
-            else:
-                binary_io = open(filename, "rb")
-
-                experiment._log_asset(
-                    binary_io,
-                    file_name=log_as_filename or log_filename,
-                    copy_to_tmp=True,
-                    asset_type=asset_type,
-                    metadata=metadata,
-                    step=step,
-                )  # done!
+            asset_type = assets_metadata[log_filename].get("type", "asset") or "asset"
+            if asset_type not in ["confusion-matrix", "embedding"]:
+                self._log_asset(
+                    experiment,
+                    path,
+                    asset_type,
+                    log_filename,
+                    assets_metadata,
+                    asset_map,
+                )
+        # Process all nested assets:
+        for log_filename in assets_metadata:
+            asset_type = assets_metadata[log_filename].get("type", "asset") or "asset"
+            if asset_type in ["confusion-matrix", "embedding"]:
+                self._log_asset(
+                    experiment,
+                    path,
+                    asset_type,
+                    log_filename,
+                    assets_metadata,
+                    asset_map,
+                )
 
     def log_code(self, experiment, filename):
         """ """
