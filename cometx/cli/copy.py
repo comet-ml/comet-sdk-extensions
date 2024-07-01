@@ -66,6 +66,7 @@ import glob
 import json
 import os
 import sys
+import urllib.parse
 
 from comet_ml import API, APIExperiment, Artifact, Experiment, OfflineExperiment
 from comet_ml._typing import TemporaryFilePath
@@ -148,6 +149,15 @@ def copy(parsed_args, remaining=None):
             raise
         else:
             print("ERROR: " + str(exc))
+
+
+def get_query_dict(url):
+    """
+    Given a URL, return query items as key/value dict.
+    """
+    result = urllib.parse.urlparse(url)
+    query = urllib.parse.parse_qs(result.query)
+    return {key: values[0] for key, values in query.items()}
 
 
 class CopyManager:
@@ -457,9 +467,61 @@ class CopyManager:
         if asset_type == "notebook":
             result = experiment.log_notebook(filename)  # done!
             asset_map[old_asset_id] = result["assetId"]
-        elif asset_type == "embedding":
+        elif asset_type == "embeddings":
             # This will come after contained assets
-            # FIXME, open and replace, then:
+            with open(filename) as fp:
+                em_json = json.load(fp)
+            # go though JSON, replace asset_ids with new asset_ids
+            # {"embeddings":
+            #    [{"tensorName": "Comet Embedding",
+            #      "tensorShape": [240, 5],
+            #      "tensorPath": "/api/asset/download?assetId=b6edbf11e548417580af163b20d7fd23&experimentKey=fe5ed0231e4e4425a13b7c25ea82c51f",
+            #      "metadataPath": "/api/asset/download?assetId=fcac2559f7cc42f8a14d20ebed4f8da1&experimentKey=fe5ed0231e4e4425a13b7c25ea82c51f",
+            #      "sprite": {
+            #         "imagePath": "/api/image/download?imageId=2052efea88b24d4b9111e0e4b0bdb003&experimentKey=fe5ed0231e4e4425a13b7c25ea82c51f",
+            #         "singleImageDim": [6, 6]
+            #      }
+            #     }]
+            # }
+            for embedding in em_json["embeddings"]:
+                if embedding.get("tensorPath"):
+                    args = get_query_dict(embedding["tensorPath"])
+                    new_args = {
+                        "experimentKey": experiment.id,
+                        "assetId": asset_map[args.get("assetId", args.get("imageId"))],
+                    }
+                    embedding[
+                        "tensorPath"
+                    ] = "/api/asset/download?assetId={assetId}&experimentKey={experimentKey}".format(
+                        **new_args
+                    )
+                if embedding.get("metadataPath"):
+                    args = get_query_dict(embedding["metadataPath"])
+                    new_args = {
+                        "experimentKey": experiment.id,
+                        "assetId": asset_map[args.get("assetId", args.get("imageId"))],
+                    }
+                    embedding[
+                        "metadataPath"
+                    ] = "/api/asset/download?assetId={assetId}&experimentKey={experimentKey}".format(
+                        **new_args
+                    )
+                if embedding.get("sprite"):
+                    if embedding["sprite"].get("imagePath"):
+                        args = get_query_dict(embedding["sprite"]["imagePath"])
+                        new_args = {
+                            "experimentKey": experiment.id,
+                            "assetId": asset_map[
+                                args.get("assetId", args.get("imageId"))
+                            ],
+                        }
+                        embedding["sprite"][
+                            "imagePath"
+                        ] = "/api/asset/download?assetId={assetId}&experimentKey={experimentKey}".format(
+                            **new_args
+                        )
+            with open(filename, "w") as fp:
+                json.dump(em_json, fp)
             result = self._log_asset_filename(
                 experiment,
                 asset_type,
@@ -526,7 +588,7 @@ class CopyManager:
         # Process all of the non-nested assets first:
         for log_filename in assets_metadata:
             asset_type = assets_metadata[log_filename].get("type", "asset") or "asset"
-            if asset_type not in ["confusion-matrix", "embedding"]:
+            if asset_type not in ["confusion-matrix", "embeddings"]:
                 self._log_asset(
                     experiment,
                     path,
@@ -538,7 +600,7 @@ class CopyManager:
         # Process all nested assets:
         for log_filename in assets_metadata:
             asset_type = assets_metadata[log_filename].get("type", "asset") or "asset"
-            if asset_type in ["confusion-matrix", "embedding"]:
+            if asset_type in ["confusion-matrix", "embeddings"]:
                 self._log_asset(
                     experiment,
                     path,
