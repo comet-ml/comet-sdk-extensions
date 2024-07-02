@@ -63,6 +63,7 @@ Asset types:
 
 import argparse
 import glob
+import io
 import json
 import os
 import sys
@@ -426,7 +427,10 @@ class CopyManager:
     def _log_asset_filename(
         self, experiment, asset_type, metadata, filename, step, log_filename
     ):
-        binary_io = open(filename, "rb")
+        if isinstance(filename, io.BytesIO):
+            binary_io = filename
+        else:
+            binary_io = open(filename, "rb")
         result = experiment._log_asset(
             binary_io,
             file_name=log_filename,
@@ -520,13 +524,12 @@ class CopyManager:
                         ] = "/api/asset/download?assetId={assetId}&experimentKey={experimentKey}".format(
                             **new_args
                         )
-            with open(filename, "w") as fp:
-                json.dump(em_json, fp)
+            binary_io = io.BytesIO(json.dumps(em_json).encode())
             result = self._log_asset_filename(
                 experiment,
                 asset_type,
                 metadata,
-                filename,
+                binary_io,
                 step,
                 log_as_filename or log_filename,
             )
@@ -546,13 +549,12 @@ class CopyManager:
                                     new_cell_asset_id = asset_map[old_cell_asset_id]
                                     cell["assetId"] = new_cell_asset_id
 
-            with open(filename, "w") as fp:
-                json.dump(cm_json, fp)
+            binary_io = io.BytesIO(json.dumps(cm_json).encode())
             result = self._log_asset_filename(
                 experiment,
                 asset_type,
                 metadata,
-                filename,
+                binary_io,
                 step,
                 log_as_filename or log_filename,
             )
