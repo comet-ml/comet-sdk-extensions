@@ -20,6 +20,7 @@ Examples:
     cometx list
     cometx reproduce
     cometx delete-assets
+    cometx config
 
 For more information:
     cometx COMMAND --help
