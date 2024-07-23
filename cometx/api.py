@@ -11,33 +11,41 @@
 #      Team. All rights reserved.
 # ****************************************
 
-from collections import defaultdict
+from typing import Any, Dict, List
 
 from comet_ml import API
 
-CACHE = defaultdict(dict)
-
 
 class API(API):
-    def get_panels(self, workspace):
+    def get_panels(self, workspace: str) -> List[Dict[str, Any]]:
         """
-        Get a list of all panels in a workspace.
+        Get the metadata for all panels in a workspace.
 
-        The return value has the following structure:
+        Args:
+            workspace (str): the name of the workspace
 
+        Returns: a list of dictionaries representing the panel
+            metadata.
+
+        Example:
+        ```python linenums="1"
+        from cometx import API
+
+        api = API()
+        panels = api.get_panels("my-workspace-name")
+        ```
+        The structure of a panel metadata:
         ```json
-        [
-            {
-                "templateId": "SzUYHmX7hnR7KrLzU1tBrHilq",
-                "owner": "owner",
-                "teamId": "owner-default",
-                "templateName": "Panel Name",
-                "queryBuilderId": "",
-                "scopeType": "PUBLIC",
-                "revisionId": 1596673911412,
-                "createdAt": 1584445331784
-            }, ...
-            ]
+        {
+         'templateId': '1234',
+         'owner': 'OWNER',
+         'teamId': 'OWNER-default',
+         'templateName': 'PANEL NAME',
+         'queryBuilderId': '',
+         'scopeType': 'PRIVATE',
+         'revisionId': 1721739799515,
+         'createdAt': 1721739799581
+        }
         ```
         """
         results = self._client.get_from_endpoint(
@@ -45,112 +53,103 @@ class API(API):
         )
         return results["codePanelTemplateRows"]
 
-    def get_python_panels(self, workspace):
-        if workspace not in CACHE["get_python_panels"]:
-            templates = self.get_panels(workspace)
-            results = []
-            for template in templates:
-                template_data = self.get_panel(template["templateId"])
-                if (
-                    "code" in template_data
-                    and "type" in template_data["code"]
-                    and template_data["code"]["type"] == "py"
-                ):
-                    template["code"] = template_data["code"]["pyCode"]
-                    results.append(template)
-            CACHE["get_python_panels"][workspace] = results
-        return CACHE["get_python_panels"][workspace]
-
-    def get_panel(self, template_id=None, instance_id=None):
+    def get_panel(self, panel_id: str) -> Dict[str, Any]:
         """
-        Get a panel JSON given a panel's instance or template id.
+        Get the panel data given the panel's ID.
 
-        The result has the following structure:
-        ```json
-        {
-            "templateId": "DyfpvKGZJvrtY1jjsYuMmLgz5",
-            "owner": "owner",
-            "teamId": "owner-default",
-            "templateName": "Panel Name",
-            "queryBuilderId": "",
-            "code": {
-                "code": "// JavaScript Code",
-                "css": "/** CSS **/",
-                "description": "Panel Description",
-                "html": "<div id=\"chart-mount\"></div>",
-                "defaultConfig": "\"\"",
-                "internalResources": [
-                    {
-                        "name": "Comet SDK",
-                        "version": "latest",
-                        "enabled": true
-                    },
-                    {
-                        "name": "Plotly.js",
-                        "version": "1.50.1",
-                        "enabled": true
-                    }
-                ],
-                "userResources": [],
-                "pyCode": "## Python Code",
-                "type": "py",
-                "pyConfig": ""
-            },
-            "rank": {
-                "templateId": "DyfpvKGZJvrtY1jjsYuMmLgz5",
-                "voteCount": 0,
-                "userVoteType": "NOVOTE"
-            },
-            "scopeType": "PRIVATE",
-            "revisionId": 1642709054245,
-            "createdAt": 1642709054465,
-            "thumbnailName": "template-thumbnail-DyfpvKGZJvrtY1jjsYuMmLgz5",
-            "editable": true
-        }
+        Args:
+            panel_id (str): the panel id (also called templateId)
+
+        Returns: a dictionary of panel data
+
+        Example:
+        ```python linenums="1"
+        from cometx import API
+
+        api = API()
+        panel = api.get_panel("1234")
         ```
         """
-        if template_id:
-            results = self._client.get_from_endpoint(
-                "code-panel/download", {"templateId": template_id}
-            )
-        elif instance_id:
-            results = self._client.get_from_endpoint(
-                "code-panel/download", {"instanceId": instance_id}
-            )
+        results = self._client.get_from_endpoint(
+            "code-panel/download", {"templateId": panel_id}
+        )
         return results
 
-    def get_panel_code(self, workspace, panel_name):
+    def get_panel_code(self, panel_id: str) -> str:
         """
-        Given a workspace name and panel name, get
-        the Python code.
-        """
-        panels = self.get_panels(workspace)
-        for panel in panels:
-            if panel["templateName"] == panel_name:
-                panel_data = self.get_panel(panel["templateId"])
-                if "pyCode" in panel_data["code"]:
-                    return panel_data["code"]["pyCode"]
+        Given a panel ID, return the active code (may be JavaScript or Python).
 
-    def download_panel_zip(self, template_id, filename=None):
+        Args:
+            panel_id (str): the panel id (also called templateId)
+
+        Example:
+        ```python linenums="1"
+        from cometx import API
+
+        api = API()
+        panels = api.get_panel_code("1234")
+        ```
         """
-        Download a panel zip file.
+        metadata = self.get_panel(panel_id)
+        if metadata["code"]["type"] == "py":
+            return metadata["code"]["pyCode"]
+        else:
+            return metadata["code"]["code"]
+
+    def download_panel_zip(self, panel_id, filename=None):
+        """
+        Given a panel ID, download the associationed panel as a zip file.
+
+        Args:
+            panel_id (str): the panel ID
+            filename (str): optional, the path/filename of where to save
+                the panel
+
+        Example:
+        ```python linenums="1"
+        from cometx import API
+
+        api = API()
+        filename = api.download_panel_zip("1234")
+        ```
         """
         results = self._client.get_from_endpoint(
-            f"template/{template_id}/download", {}, return_type="binary"
+            f"template/{panel_id}/download", {}, return_type="binary"
         )
-        filename = filename if filename else f"panel-{template_id}.zip"
+        filename = filename if filename else f"panel-{panel_id}.zip"
         with open(filename, "wb") as fp:
             fp.write(results)
         return filename
 
-    def upload_panel_zip(self, workspace_id, filename):
+    def upload_panel_zip(self, workspace: str, filename: str) -> Dict[str, str]:
         """
         Upload a panel zip file to a workspace.
+
+        Args:
+            workspace (str): the workspace to place the panel into
+            filename (str): the name of the panel zip to upload
+
+        Returns: dictionary of results
+
+        Example:
+        ```python linenums="1"
+        from cometx import API
+
+        api = API()
+        panels = api.upload_panel_zip("my-workspace", "panel-1234.zip")
+        ```
         """
-        results = self._client.post_from_endpoint(
-            "write/template/upload", {"teamId": workspace_id}, files={"file": filename}
-        )
-        return results
+        params = {"teamName": workspace}
+        payload = {}
+        with open(filename, "rb") as fp:
+            files = {"file": (filename, fp)}
+            results = self._client.post_from_endpoint(
+                "write/template/upload",
+                payload=payload,
+                params=params,
+                files=files,
+            )
+        return results.json()
 
     def log_pr_curves(
         self, experiment, y_true, y_predicted, labels=None, overwrite=False, step=None
