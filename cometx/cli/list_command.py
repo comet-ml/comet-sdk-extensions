@@ -45,14 +45,28 @@ def get_parser_arguments(parser):
         type=str,
         default=None,
     )
+    parser.add_argument(
+        "--debug",
+        help="Provide debug info",
+        action="store_true",
+        default=False,
+    )
 
 
 def list(parsed_args, remaining=None):
     try:
         downloader = DownloadManager()
-    except ValueError:
-        display_invalid_api_key()
-        return
+    except ValueError as exc:
+        if parsed_args.debug:
+            raise exc from None
+        else:
+            display_invalid_api_key()
+            return
+    except Exception as exc:
+        if parsed_args.debug:
+            raise exc from None
+        else:
+            print("List aborted: %s" % str(exc))
 
     try:
         downloader.download(
@@ -61,12 +75,18 @@ def list(parsed_args, remaining=None):
             list_items=True,
             query=parsed_args.query,
         )
-    except InvalidAPIKey:
-        display_invalid_api_key()
+    except InvalidAPIKey as exc:
+        if parsed_args.debug:
+            raise exc from None
+        else:
+            display_invalid_api_key()
     except Exception as exc:
-        print("List aborted: %s" % str(exc))
+        if parsed_args.debug:
+            raise exc from None
+        else:
+            print("List aborted: %s" % str(exc))
     except KeyboardInterrupt:
-        print("User canceled download by keyboard interrupt")
+        print("User canceled list by keyboard interrupt")
 
 
 def main(args):

@@ -22,18 +22,20 @@ import os
 import re
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
+from typing import Any, List, Optional
 
 try:
     from tqdm import tqdm as ProgressBar
 except ImportError:
     from cometx.utils import ProgressBar
 
-from comet_ml.api import API
+from comet_ml.api import APIExperiment
 from comet_ml.artifacts import _get_artifact
 from comet_ml.config import get_config
 from comet_ml.summary import Summary
 
 from ..._version import __version__
+from ...api import API
 from ...utils import _input_user_yn, get_query_experiments
 
 LOGGER = logging.getLogger(__name__)
@@ -191,7 +193,7 @@ class DownloadManager:
         The method to list resources.
 
         Args:
-            comet_path: (str, optional) the Comet path to the experiment, artifact, or model-registry
+            comet_path: (str, optional) the Comet path to the experiment, artifact, panel, or model-registry
             use_name: (bool, optional) if True, use the experiment name for folder name; else
                 use the experiment ID for folder name
         """
@@ -224,7 +226,7 @@ class DownloadManager:
         The top-level method to download resources.
 
         Args:
-            comet_path: (str, optional) the Comet path to the experiment, artifact, or model-registry
+            comet_path: (str, optional) the Comet path to the experiment, artifact, panel, or model-registry
             query: (str, option) a Comet query string. See:
                 https://www.comet.com/docs/v2/api-and-sdk/python-sdk/reference/API/#apiquery
             include: (list of str, optional) experiment resources to include in download
@@ -282,13 +284,15 @@ class DownloadManager:
         self.summary = {key: 0 for key in self.RESOURCE_FUNCTIONS.keys()}
         self.summary["artifacts"] = 0
         self.summary["model-registry"] = 0
+        self.summary["panels"] = 0
 
         comet_path = clean_comet_path(comet_path)
         args = comet_path.split("/") if comet_path is not None else []
         artifact = len(args) > 1 and args[1] == "artifacts"
         model_registry = len(args) > 1 and args[1] == "model-registry"
+        panel = len(args) > 1 and args[1] == "panels"
 
-        # Downloads can be one of: experiment, model-registry, or artifact
+        # Downloads can be one of: experiment, panel, model-registry, or artifact
         if artifact is True:
             if list_items:
                 if len(args) == 2:
@@ -324,6 +328,24 @@ class DownloadManager:
                     raise ValueError(
                         "use `workspace/model-registry/name[/version_or_stage]`"
                     )
+        elif panel is True:
+            if list_items:
+                if len(args) == 2:
+                    self.list_panels(args[0])
+                elif len(args) == 3:
+                    self.list_panels(args[0], args[2])
+                else:
+                    raise ValueError("use `workspace/panel[/name_or_id]`")
+            else:
+                if len(args) == 2:
+                    self.verify_workspace(args[0])
+                    all_panels = self.api.get_panels(args[0])
+                    for panel in all_panels:
+                        self.download_panel(args[0], panel["templateId"])
+                elif len(args) == 3:
+                    self.download_panel(args[0], args[2])
+                else:
+                    raise ValueError("use `workspace/panel/name_or_id`")
         else:
             # Experiment
             if len(self.include) == 0:
@@ -426,6 +448,49 @@ class DownloadManager:
             model_names = self.api.get_registry_model_names(workspace)
             for name in model_names:
                 self.list_model_versions(workspace, name)
+
+    def list_panels(self, workspace, name_or_id=None):
+        # type: (str, Optional[str]) -> None
+        """
+        List the panels, one per line.
+
+        Args:
+            workspace: (str) name of workspace
+            name_or_id: (str, optional) name or id of panel
+        """
+        self.verify_workspace(workspace)
+        all_panels = self.api.get_panels(workspace)
+        if name_or_id is not None:
+            selected = [
+                panel
+                for panel in all_panels
+                if (
+                    panel["templateId"] == name_or_id
+                    or panel["templateName"] == name_or_id
+                )
+            ]
+            if selected:
+                panel = selected[0]
+                print(
+                    "%s/panel/%s (%s)"
+                    % (
+                        workspace,
+                        panel["templateName"],
+                        panel["templateId"],
+                    )
+                )
+                for key, value in panel.items():
+                    print("    %s:" % key, repr(value))
+        else:
+            for panel in all_panels:
+                print(
+                    "%s/panel/%s (%s)"
+                    % (
+                        workspace,
+                        panel["templateName"],
+                        panel["templateId"],
+                    )
+                )
 
     def list_model_versions(self, workspace, name):
         # type: (str, str) -> None
@@ -663,6 +728,42 @@ class DownloadManager:
                 os.makedirs(path, exist_ok=True)
                 with open(filepath, "w") as f:
                     f.write(graph)
+
+    def download_panel(self, workspace, name_or_id):
+        # type: (APIExperiment, str, str) -> None
+        """
+        Download a panel given its name or ID.
+
+        Args:
+            workspace: (str) name of workspace
+            name_or_id: (str) name or ID of panel
+        """
+        self.verify_workspace(workspace)
+        if self.flat:
+            path = self.root
+        else:
+            path = os.path.join(self.root, workspace, "panels")
+
+        all_panels = self.api.get_panels(workspace)
+        selected = [
+            panel
+            for panel in all_panels
+            if (
+                panel["templateId"] == name_or_id or panel["templateName"] == name_or_id
+            )
+        ]
+        if selected:
+            panel_id = selected[0]["templateId"]
+        else:
+            raise Exception("No such panel: %s" % name_or_id)
+
+        os.makedirs(path, exist_ok=True)
+        results = self.api.download_panel_zip(
+            panel_id, os.path.join(path, "panel-%s.zip" % panel_id)
+        )
+        if results:
+            print("Downloaded %s" % results)
+            self.summary["panels"] += 1
 
     def download_model(self, workspace, name, version_or_stage=None):
         # type: (APIExperiment, str, str, Optional[str]) -> None
@@ -1246,7 +1347,10 @@ class DownloadManager:
         path = os.path.join(self.root, workspace, project_name)
 
         project_metadata = self.api.get_project(workspace, project_name)
-        project_metadata["cometDownloadVersion"] = __version__
+        if project_metadata:
+            project_metadata["cometDownloadVersion"] = __version__
+        else:
+            raise Exception("No such project: %s/%s" % (workspace, project_name))
 
         filepath = os.path.join(path, "project_metadata.json")
         if self._should_write(filepath) and "project_metadata" in self.include:

@@ -43,6 +43,11 @@ To download models from the registry:
 $ cometx download WORKSPACE/model-registry/NAME [FLAGS ...]
 $ cometx download WORKSPACE/model-registry/NAME/VERSION-OR-STAGE [FLAGS ...]
 
+To download panels:
+
+$ cometx download WORKSPACE/panels/NAME-OR-ID [FLAGS ...]
+$ cometx download WORKSPACE/panels [FLAGS ...]
+
 Where [FLAGS ...] is zero or more of the following:
 
 * `--parallel N` - the number of threads to use (default is based on CPUs)
