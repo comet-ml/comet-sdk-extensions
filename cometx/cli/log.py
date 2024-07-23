@@ -17,8 +17,7 @@ Examples:
 To log to an experiment or set other key:value to multiple experiments:
 
 
-$ cometx log WORKSPACE/PROJECT FOLDER --type=all
-$ cometx log WORKSPACE/PROJECT/EXPERIMENT-KEY FILENAME --type=TYPE
+$ cometx log WORKSPACE/PROJECT/EXPERIMENT-KEY FILENAME ... --type=TYPE
 $ cometx log WORKSPACE/PROJECT --type=other --set "key:value"
 $ cometx log WORKSPACE --type=other --set "key:value"
 
@@ -88,8 +87,8 @@ def get_parser_arguments(parser):
     )
     parser.add_argument(
         "FILENAME",
-        help=("The filename or directory to log"),
-        nargs="?",
+        help=("The filename(s) to log"),
+        nargs="*",
         type=str,
         default=None,
     )
@@ -134,11 +133,7 @@ def log_cli(parsed_args):
         parsed_args.COMET_PATH.split("/") if parsed_args.COMET_PATH is not None else []
     )
 
-    if not comet_path:
-        workspace = None
-        project_name = None
-        experiment_key = None
-    elif len(comet_path) == 1:
+    if len(comet_path) == 1:
         workspace = comet_path[0]
         project_name = None
         experiment_key = None
@@ -161,49 +156,20 @@ def log_cli(parsed_args):
     else:
         experiments = api.get_experiments(workspace, project_name)
 
-    if parsed_args.type == "all":
+    if parsed_args.type == "code":
         if not parsed_args.FILENAME:
-            raise Exception("Logging `all` requires a folder")
+            raise Exception("Logging `code` requires file(s) or folder(s)")
 
         for experiment in experiments:
-            if os.path.exists(os.path.join(parsed_args.FILENAME, "metrics.jsonl")):
-                log_experiment_metrics_from_file(
-                    experiment, os.path.join(parsed_args.FILENAME, "metrics.jsonl")
-                )
-
-            if os.path.exists(os.path.join(parsed_args.FILENAME, "parameters.json")):
-                log_experiment_parameters_from_file(
-                    experiment, os.path.join(parsed_args.FILENAME, "parameters.json")
-                )
-
-            if os.path.exists(os.path.join(parsed_args.FILENAME, "others.jsonl")):
-                log_experiment_others_from_file(
-                    experiment, os.path.join(parsed_args.FILENAME, "others.jsonl")
-                )
-
-            for dirname in glob.glob(os.path.join(parsed_args.FILENAME, "assets", "*")):
-                if os.path.isdir(dirname):
-                    base, asset_type = dirname.rsplit("/", 1)
-                    log_experiment_assets_from_file(
-                        experiment,
-                        os.path.join(parsed_args.FILENAME, "assets", asset_type, "*"),
-                        asset_type,
-                    )
-
-        # FIXME: output
-
-    elif parsed_args.type == "code":
-        if not parsed_args.FILENAME:
-            raise Exception("Logging `code` requires a file or folder")
-
-        for experiment in experiments:
-            log_experiment_code_from_file(experiment, parsed_args.FILENAME)
+            for filename in parsed_args.FILENAME:
+                log_experiment_code_from_file(experiment, filename)
 
     elif parsed_args.type == "other":
         # two possibilities: log key:value to set of experiments; log filename to experiment
         if parsed_args.FILENAME:
             for experiment in experiments:
-                log_experiment_others_from_file(experiment, parsed_args.FILENAME)
+                for filename in parsed_args.FILENAME:
+                    log_experiment_others_from_file(experiment, filename)
             return
 
         elif not parsed_args.set or ":" not in parsed_args.set:
@@ -214,26 +180,27 @@ def log_cli(parsed_args):
 
     elif parsed_args.type == "metrics":
         if not parsed_args.FILENAME:
-            raise Exception("Logging `metrics` requires a file")
+            raise Exception("Logging `metrics` requires file(s)")
 
         for experiment in experiments:
-            log_experiment_metrics_from_file(experiment, parsed_args.FILENAME)
+            for filename in parsed_args.FILENAME:
+                log_experiment_metrics_from_file(experiment, filename)
 
     elif parsed_args.type == "parameters":
         if not parsed_args.FILENAME:
-            raise Exception("Logging `parameters` requires a file")
+            raise Exception("Logging `parameters` requires file(s)")
 
         for experiment in experiments:
-            log_experiment_parameters_from_file(experiment, parsed_args.FILENAME)
+            for filename in parsed_args.FILENAME:
+                log_experiment_parameters_from_file(experiment, filename)
 
     else:
         if not parsed_args.FILENAME:
-            raise Exception("Logging an asset requires a file")
+            raise Exception("Logging an asset requires file(s)")
 
         for experiment in experiments:
-            log_experiment_assets_from_file(
-                experiment, parsed_args.FILENAME, parsed_args.type
-            )
+            for filename in parsed_args.FILENAME:
+                log_experiment_assets_from_file(experiment, filename, parsed_args.type)
 
     for experiment in experiments:
         experiment.end()
