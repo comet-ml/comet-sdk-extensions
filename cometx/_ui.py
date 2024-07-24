@@ -52,6 +52,7 @@ class SessionState(dict):
 
 class Streamlit:
     def __init__(self, parent=None):
+        self.layout = widgets.Layout(width="auto")
         self._response = {}
         self._output = widgets.Output()
         self.session_state = SessionState()
@@ -207,8 +208,23 @@ class Streamlit:
     def text_input(
         self, label, value, key=None, on_change=None, args=None, kwargs=None
     ):
-        # FIXME
-        pass
+        key = self._make_key("input", key)
+        retval = self._response.get(key, value)
+        widget = widgets.Text(
+            value=retval,
+            description=label,
+            continuous_update=False,
+            layout=self.layout,
+        )
+        widget.style = {"description_width": "auto"}
+        self._observe(
+            widget,
+            lambda results: self._rerun(key, results["owner"].value, on_change, args),
+            names="value",
+        )
+        self._append(widget)
+        self._response[key] = retval
+        return retval
 
     def checkbox(self, label, value, key=None, on_change=None, args=None, kwargs=None):
         # FIXME

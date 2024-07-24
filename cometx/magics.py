@@ -29,6 +29,7 @@ def cometx(line, cell=None):
     # workspace/project
     # workspace/project/experiment
     # workspace/project "Panel Name"
+    code = cell
 
     if " " in line.strip():
         line, panel_name = line.split(" ", 1)
@@ -57,7 +58,7 @@ from cometx import API
 from comet_ml import ui
 import datetime
 api = API()
-templates = api.get_python_panels("{workspace}")
+templates = api.get_panels("{workspace}")
 selected = ui.dropdown(
             "Python Panels:", templates,
             format_func=lambda item: "%s - %s" % (item["templateName"], datetime.datetime.fromtimestamp(item["revisionId"] / 1000)))
@@ -79,12 +80,14 @@ if selected:
 
     if "def main(" not in cell:
         cell = "\n".join(["    %s\n" % line for line in cell.splitlines()])
+        # We replace API with this to allow use of local workspace and project:
         cell = """
 def main(st):
+    import cometx
     import comet_ml
     from comet_ml._ui import UI
 
-    class API(comet_ml.API):
+    class API(cometx.API):
         def get_panel_project_name(self):
             return "{project_name}"
         def get_panel_workspace(self):
@@ -107,23 +110,34 @@ def main(st):
                     if not name.startswith("sys.")
                 ]
             )
-    # Replace API with new API
-    comet_ml.API = API
     # Replace _st with ipywidgets
     class UI(UI):
-        _st = st
+        _st = st # argument passed into main()
         session_state = st.session_state
     comet_ml.ui = UI()
-    del UI, comet_ml, st, API
+    comet_ml.API = API
+    del comet_ml, API, UI, cometx
     {cell}
     import comet_ml
-    cols = comet_ml.ui.columns(2)
-    cols[-1].button("Deploy to Comet...")
+    from cometx.panel_utils import create_panel_zip
+    ui.display("<hr>")
+    cols = ui.columns(2)
+    panel_name = cols[0].input("Name of Panel:", "Custom Panel")
+    if cols[1].button("Deploy to Comet"):
+        if panel_name:
+            api = comet_ml.API()
+            zip_filename = create_panel_zip(
+                panel_name,
+                '''{cell_str}''',
+            )
+            api.upload_panel_zip("{workspace}", zip_filename)
+    ui.display("<hr>")
 """.format(
             cell=cell,
             workspace=workspace,
             project_name=project_name,
             experiment_key=experiment_key,
+            cell_str=code.replace("'", "\\'"),
         )
     code = """
 ## User code:
