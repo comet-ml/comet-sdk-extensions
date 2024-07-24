@@ -20,6 +20,7 @@ where SOURCE is:
 
 * if not --symlink, "WORKSPACE/PROJECT/EXPERIMENT", "WORKSPACE/PROJECT", or "WORKSPACE" folder
 * if --symlink, then it is a Comet path to workspace or workspace/project
+* "WORKSPACE/panels" or "WORKSPACE/panels/PANEL-ZIP-FILENAME" to copy panels
 
 where DESTINATION is:
 
