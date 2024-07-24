@@ -69,7 +69,7 @@ import os
 import sys
 import urllib.parse
 
-from comet_ml import API, APIExperiment, Artifact, Experiment, OfflineExperiment
+from comet_ml import APIExperiment, Artifact, Experiment, OfflineExperiment
 from comet_ml._typing import TemporaryFilePath
 from comet_ml.connection import compress_git_patch
 from comet_ml.file_uploader import GitPatchUploadProcessor
@@ -82,6 +82,7 @@ from comet_ml.messages import (
     SystemDetailsMessage,
 )
 
+from ..api import API
 from ..utils import remove_extra_slashes
 from .copy_utils import upload_single_offline_experiment
 
@@ -209,6 +210,15 @@ class CopyManager:
             raise Exception(
                 f"{workspace_dst} does not exist; use the Comet UI to create it"
             )
+
+        if project_src == "panels":
+            # experiment_src may be "*" or filename
+            for filename in glob.glob(
+                os.path.join(workspace_src, project_src, experiment_src)
+            ):
+                print("Uploading panel zip: %r to %r..." % (filename, workspace_dst))
+                self.api.upload_panel_zip(workspace_dst, filename)
+            return
 
         # For checking if the project_dst exists below:
         projects = self.api.get_projects(workspace_dst)
@@ -494,10 +504,10 @@ class CopyManager:
                         "experimentKey": experiment.id,
                         "assetId": asset_map[args.get("assetId", args.get("imageId"))],
                     }
-                    embedding["tensorPath"] = (
-                        "/api/asset/download?assetId={assetId}&experimentKey={experimentKey}".format(
-                            **new_args
-                        )
+                    embedding[
+                        "tensorPath"
+                    ] = "/api/asset/download?assetId={assetId}&experimentKey={experimentKey}".format(
+                        **new_args
                     )
                 if embedding.get("metadataPath"):
                     args = get_query_dict(embedding["metadataPath"])
@@ -505,10 +515,10 @@ class CopyManager:
                         "experimentKey": experiment.id,
                         "assetId": asset_map[args.get("assetId", args.get("imageId"))],
                     }
-                    embedding["metadataPath"] = (
-                        "/api/asset/download?assetId={assetId}&experimentKey={experimentKey}".format(
-                            **new_args
-                        )
+                    embedding[
+                        "metadataPath"
+                    ] = "/api/asset/download?assetId={assetId}&experimentKey={experimentKey}".format(
+                        **new_args
                     )
                 if embedding.get("sprite"):
                     if embedding["sprite"].get("imagePath"):
@@ -519,10 +529,10 @@ class CopyManager:
                                 args.get("assetId", args.get("imageId"))
                             ],
                         }
-                        embedding["sprite"]["imagePath"] = (
-                            "/api/asset/download?assetId={assetId}&experimentKey={experimentKey}".format(
-                                **new_args
-                            )
+                        embedding["sprite"][
+                            "imagePath"
+                        ] = "/api/asset/download?assetId={assetId}&experimentKey={experimentKey}".format(
+                            **new_args
                         )
             binary_io = io.BytesIO(json.dumps(em_json).encode())
             result = self._log_asset_filename(
