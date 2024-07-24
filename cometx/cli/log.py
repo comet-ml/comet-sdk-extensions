@@ -18,6 +18,9 @@ To log to an experiment or set other key:value to multiple experiments:
 
 
 $ cometx log WORKSPACE/PROJECT/EXPERIMENT-KEY FILENAME ... --type=TYPE
+$ cometx log WORKSPACE PANEL-ZIP-FILENAME ... --type=panel
+$ cometx log WORKSPACE PANEL.py ... --type=panel
+$ cometx log WORKSPACE PANEL-URL ... --type=panel
 $ cometx log WORKSPACE/PROJECT --type=other --set "key:value"
 $ cometx log WORKSPACE --type=other --set "key:value"
 
@@ -30,6 +33,7 @@ Where TYPE is one of the following names:
 * image
 * metrics
 * notebook
+* panel
 * text-sample
 * video
 * other
@@ -39,9 +43,12 @@ import glob
 import json
 import os
 import sys
+import tempfile
 
-from comet_ml import API
+import requests
 
+from ..api import API
+from ..panel_utils import create_panel_zip
 from ..utils import get_file_extension, get_query_experiments
 from .utils import (
     log_points_3d_off_file,
@@ -153,10 +160,47 @@ def log_cli(parsed_args):
         experiments = get_query_experiments(
             api, parsed_args.query, workspace, project_name
         )
-    else:
+    elif parsed_args.type != "panel":
         experiments = api.get_experiments(workspace, project_name)
+    else:
+        experiments = []
 
-    if parsed_args.type == "code":
+    if parsed_args.type == "panel":
+        for item in parsed_args.FILENAME:
+            if item.startswith("http"):
+                # TODO:
+                # https://github.com/comet-ml/comet-examples/blob/master/panels/TensorboardProfileViewer.py
+                # turns into:
+                # https://raw.githubusercontent.com/comet-ml/comet-examples/master/panels/TensorboardProfileViewer.py
+                print("Downloading %r..." % item)
+                response = requests.get(item)
+                if item.endswith(".py"):
+                    code = response.content.decode()
+                    print("   Creating zipped code...")
+                    filename = create_panel_zip(item, code)
+                    print("   Uploading panel...")
+                    api.upload_panel_zip(workspace, filename)
+                elif item.endswith(".zip"):
+                    zipcontents = response.content
+                    print("    Saving zip file...")
+                    with tempfile.NamedTemporaryFile(suffix=".zip") as fp:
+                        fp.write(zipcontents)
+                        print("    Uploading panel...")
+                        api.upload_panel_zip(workspace, fp.name)
+            elif item.endswith(".zip"):
+                print("Uploading panel...")
+                api.upload_panel_zip(workspace, item)
+            elif item.endswith(".py"):
+                print("Reading contents of zip file...")
+                with open(item) as fp:
+                    code = fp.read()
+                print("Creating zipped code...")
+                filename = create_panel_zip(item, code)
+                print("Uploading panel...")
+                api.upload_panel_zip(workspace, filename)
+            else:
+                raise Exception("Unknown panel type")
+    elif parsed_args.type == "code":
         if not parsed_args.FILENAME:
             raise Exception("Logging `code` requires file(s) or folder(s)")
 
