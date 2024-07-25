@@ -16,10 +16,13 @@ import os
 import re
 import shutil
 import tempfile
+import time
+from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import unquote
 
 import comet_ml
+from comet_ml.annotations import Box, Layer
 from comet_ml.cli_args_parse import _parse_cmd_args, _parse_cmd_args_naive
 from comet_ml.data_structure import Histogram
 
@@ -28,6 +31,13 @@ import wandb
 from ..utils import download_url, remove_extra_slashes
 
 MAX_METRIC_SAMPLES = 15_000
+
+
+def get_json_value(item):
+    if hasattr(item, "_json_dict"):
+        return item._json_dict
+    else:
+        return item
 
 
 class DownloadManager:
@@ -64,13 +74,13 @@ class DownloadManager:
         self.ignore = ignore if ignore else []
         self.include_experiments = None
 
-    def download_file_task(self, path, file):
+    def download_file_task(self, path, file, doit=False):
         def task():
             with tempfile.TemporaryDirectory() as tmpdir:
                 file.download(root=tmpdir)
                 shutil.copy(os.path.join(tmpdir, file.name), path)
 
-        if self.queue is None:
+        if self.queue is None or doit:
             # Do it now:
             task()
         else:
@@ -83,6 +93,7 @@ class DownloadManager:
 
     def reset_run(self):
         self.asset_metadata = []
+        self.annotations = []
         self.parameters = []
 
     def download(self, PATH):
@@ -127,7 +138,7 @@ class DownloadManager:
                 step = None
                 log_as_filename = None
                 parts = filename.rsplit("_", 3)
-                if len(parts) == 3 and parts[1].isdigit():
+                if len(parts) == 3 and parts[1].isdigit() and parts[0] != "boxes":
                     log_as_filename, step, _ = parts
                     _, ext = os.path.splitext(filename)
                     log_as_filename += ext
@@ -261,8 +272,93 @@ class DownloadManager:
         path = self.get_path(run, "run", filename="requirements.txt")
         self.download_file_task(path, file)
 
+    def convert_annotation(self, data, i, width):
+        """
+        Convert wandb box_data into a standard format.
+        """
+        # data: {'box_data': [{'position': {'minX': 633, 'maxX': 734, 'minY': 246, 'maxY': 569}, 'class_id': 2, 'box_caption': 'person (99.720)', 'domain': 'pixel', 'scores': {'score': 99.71950650215149}}, {'position': {'minX': 521, 'maxX': 660, 'minY': 249, 'maxY': 609}, 'class_id': 2, 'box_caption': 'person (99.932)', 'domain': 'pixel', 'scores': {'score': 99.93243217468262}}, {'position': {'minX': 757, 'maxX': 776, 'minY': 320, 'maxY': 369}, 'class_id': 2, 'box_caption': 'person (84.234)', 'domain': 'pixel', 'scores': {'score': 84.23382639884949}}], 'class_labels': {'0': 'car', '1': 'truck', '2': 'person', '3': 'traffic light', '4': 'stop sign', '5': 'bus', '6': 'bicycle', '7': 'motorbike', '8': 'parking meter', '9': 'bench', '10': 'fire hydrant', '11': 'aeroplane', '12': 'boat', '13': 'train'}}
+        # order tells which image
+        boxes = []
+        labels = data["class_labels"]
+        for box in data["box_data"]:
+            label = labels[str(box["class_id"])]
+            score = box["scores"]["score"]
+            boxes.append(
+                Box(
+                    box=(
+                        (i * width) + box["position"]["minX"],
+                        box["position"]["minY"],
+                        box["position"]["maxX"] - box["position"]["minX"],
+                        box["position"]["maxY"] - box["position"]["minY"],
+                    ),
+                    label=label,
+                    score=score,
+                )
+            )
+        return boxes
+
+    def load_annotations(self, run, pathname, i, width):
+        """
+        Given a pathname, get the annotations
+        """
+        filename = os.path.basename(pathname)
+        path = self.get_path(run, "assets", "asset", filename=filename)
+        while not os.path.exists(path):
+            print("Waiting for file...")
+            time.sleep(10)
+            # FIXME: may not be completed yet! Let's do this sync
+        with open(path) as fp:
+            # convert the wandb json boxes to standard format
+            return self.convert_annotation(json.load(fp), i, width)
+
+    def process_annotation(self, run, annotation):
+        # FIXME: break up image into 1200 x 800 chunks, side-by-side and apply annotations
+        # {'_type': 'images', 'count': 5, 'width': 1200, 'format': 'png', 'height': 800, 'all_boxes': [
+        # {'predictions': {'path': 'media/metadata/boxes2D/boxes_0_72d6bd64.boxes2D.json', 'size': 793, '_type': 'boxes2D', 'sha256': '72d6bd64ffa727fcfc9c182d48e726c7578b6fd3e3444476e0bfec7ae7fb4d12'}},
+        # {'predictions': {'path': 'media/metadata/boxes2D/boxes_0_9b5c0bbd.boxes2D.json', 'size': 3090, '_type': 'boxes2D', 'sha256': '9b5c0bbde53b8b27c01ba08404d0a34793bd851b59b0387ce668bf9028c390e8'}},
+        # {'predictions': {'_type': 'boxes2D', 'sha256': '33c03f8630e76ee4d5371b0b7d55fd38d9610e883886da730f74268821d5d38f', 'path': 'media/metadata/boxes2D/boxes_0_33c03f86.boxes2D.json', 'size': 1849}},
+        # {'predictions': {'_type': 'boxes2D', 'sha256': '1c5422d07299f48880800748ef98d62533f79bc8821b1782f4b44a6b8f8f5bf6', 'path': 'media/metadata/boxes2D/boxes_0_1c5422d0.boxes2D.json', 'size': 439}},
+        # {'predictions': {'path': 'media/metadata/boxes2D/boxes_0_2ef7b7e5.boxes2D.json', 'size': 1305, '_type': 'boxes2D', 'sha256': '2ef7b7e59de532123ecbac12528b65c750a67cb22485848a19d3b7d916e82b8a'}}]}
+        layer_boxes = defaultdict(list)
+        image_name = None
+        for i, layer in enumerate(annotation["all_boxes"]):
+            for name in layer.keys():
+                image_name, _ = os.path.splitext(os.path.basename(layer[name]["path"]))
+                image_name, _ = image_name.rsplit("_", 1)
+                boxes = self.load_annotations(
+                    run, layer[name]["path"], i, annotation["width"]
+                )
+                if boxes:
+                    layer_boxes[name].extend(boxes)
+        # set metadata of image to be string of dict or None
+        layers = []
+        for key in layer_boxes:
+            layers.append(
+                Layer(
+                    boxes=layer_boxes[key],
+                    name=key,
+                ).to_dict()
+            )
+        if layers:
+            return image_name, layers
+        else:
+            return None
+
+    def find_asset_metadata(self, image_name):
+        for metadata in self.asset_metadata:
+            if metadata["fileName"] == image_name:
+                return metadata
+        return None
+
     def download_asset_metadata(self, run):
         path = self.get_path(run, "assets", filename="assets_metadata.jsonl")
+        # check to see if an image has annotations
+        for annotation in self.annotations:
+            results = self.process_annotation(run, annotation)
+            if results:
+                image_name, annotation = results
+                metadata = self.find_asset_metadata(image_name + ".png")
+                metadata["metadata"] = json.dumps({"annotations": annotation})
         with open(path, "w") as fp:
             for metadata in self.asset_metadata:
                 fp.write(json.dumps(metadata) + "\n")
@@ -682,6 +778,13 @@ class DownloadManager:
                 if item.startswith("_"):
                     continue
 
+                value = get_json_value(run.summary[item])
+
+                if isinstance(value, dict):
+                    if item == "boxes":
+                        self.annotations.append(value)
+                    continue
+
                 fp.write(json.dumps({"metric": item, "count": count}) + "\n")
                 filename = self.get_path(
                     run, "metrics", filename="metric_%05d.jsonl" % count
@@ -691,7 +794,7 @@ class DownloadManager:
                     ts = int(timestamp * 1000) if timestamp is not None else None
                     data = {
                         "metricName": item,
-                        "metricValue": run.summary[item],
+                        "metricValue": value,
                         "timestamp": ts,
                         "step": None,
                         "epoch": None,
