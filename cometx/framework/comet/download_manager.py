@@ -1184,7 +1184,7 @@ class DownloadManager:
                 with open(filepath, "w") as f:
                     f.write(output)
 
-    def submit_task(self, file_path, experiment, method_name, *args, **kwargs):
+    def submit_task(self, file_path, experiment, method_name, args, kwargs):
         def task():
             method = getattr(experiment, method_name)
             results = method(*args, **kwargs)
@@ -1258,7 +1258,9 @@ class DownloadManager:
                 self.summary["assets"] += 1
                 path, filename = os.path.split(file_path)
                 os.makedirs(path, exist_ok=True)
-                self.submit_task(file_path, experiment, "get_asset", [asset["assetId"]])
+                self.submit_task(
+                    file_path, experiment, "get_asset", [asset["assetId"]], {}
+                )
 
     def download_asset(self, experiment, asset_filename):
         # type: (APIExperiment) -> None
