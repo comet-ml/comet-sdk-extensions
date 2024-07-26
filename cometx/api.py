@@ -15,6 +15,8 @@ from typing import Any, Dict, List
 
 from comet_ml import API
 
+from .panel_utils import create_panel_zip
+
 
 class API(API):
     def get_panels(self, workspace: str) -> List[Dict[str, Any]]:
@@ -120,6 +122,31 @@ class API(API):
         with open(filename, "wb") as fp:
             fp.write(results)
         return filename
+
+    def upload_panel_code(self, workspace: str, panel_name: str, code: str) -> None:
+        """
+        Upload Python code as a panel in a workspace.
+
+        Args:
+            workspace (str): the workspace to place the panel into
+            panel_name (str): the name of the panel
+            code (str): the code to turn into a panel
+
+        Example:
+        ```python linenums="1"
+        from cometx.api import API
+
+        api = API()
+
+        code = '''
+        from comet_ml import ui
+        ui.display("Hello, world, from a script!")
+        '''
+        api.upload_panel_code("my-workspace", "My Python Script", code)
+        ```
+        """
+        filename = create_panel_zip(panel_name, code)
+        self.upload_panel_zip(workspace, filename)
 
     def upload_panel_zip(self, workspace: str, filename: str) -> Dict[str, str]:
         """
