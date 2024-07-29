@@ -109,7 +109,6 @@ class Streamlit:
         self._append(image)
 
     def image(self, data):
-        # FIXME: ext, or type
         image = widgets.Image(
             value=data,
         )
@@ -181,8 +180,39 @@ class Streamlit:
         args=None,
         kwargs=None,
     ):
-        # FIXME
-        pass
+        key = self._make_key("multiselect", key)
+        if default is None:
+            default = []
+        options = list(options)
+        if len(options) == 0:
+            options = [None]
+        value = self._response.get(key, default)
+        label_options = [format_func(option) for option in options]
+        value = [x for x in value if x in label_options]
+        widget = widgets.SelectMultiple(
+            style={
+                "description_width": "initial",
+                "width": "initial",
+            },
+            options=label_options,
+            value=value,
+        )
+        self._observe(
+            widget,
+            lambda results: self._rerun(key, results["new"], on_change, args),
+            names="value",
+        )
+        self._append(widgets.HTML(label))
+        self._append(widget)
+        self._response[key] = value
+        return value
+
+    def _check_results(self, results, label_options):
+        valid = []
+        for item in results["new"]:
+            if item in label_options:
+                valid.append(item)
+        return valid
 
     def plotly_chart(self, figure, use_container_width=False):
         # FIXME
@@ -252,7 +282,8 @@ class Streamlit:
         self._execute()
 
     def _rerun(self, key, value, callback, args):
-        self._response[key] = value
+        if key is not None:
+            self._response[key] = value
         if callback:
             if args is None:
                 callback()
