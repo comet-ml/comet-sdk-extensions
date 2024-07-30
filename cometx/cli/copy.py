@@ -663,6 +663,8 @@ class CopyManager:
                 if name.startswith("sys.") and "system-metrics" in self.ignore:
                     continue
                 value = dict_line.get("metricValue", None)
+                if value is None:
+                    continue
                 step = dict_line.get("step", None)
                 epoch = dict_line.get("epoch", None)
                 context = dict_line.get("runContext", None)
