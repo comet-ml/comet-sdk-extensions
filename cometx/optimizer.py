@@ -117,6 +117,8 @@ def optimizer_populate(workspace, project_name, config):
 
     # Update the new_config with the given config:
     update_dict(new_config, config["config"])
+    if "algorithm" in config:
+        new_config["algorithm"] = config["algorithm"]
 
     print("New config:")
     print(new_config)
