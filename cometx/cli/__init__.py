@@ -21,6 +21,7 @@ Examples:
     cometx reproduce
     cometx delete-assets
     cometx config
+    cometx smoke-test
 
 For more information:
     cometx COMMAND --help
@@ -31,7 +32,16 @@ import sys
 from cometx import __version__
 
 # Import CLI commands:
-from . import config, copy, delete_assets, download, list_command, log, reproduce
+from . import (
+    config,
+    copy,
+    delete_assets,
+    download,
+    list_command,
+    log,
+    reproduce,
+    smoke_test,
+)
 
 
 def add_subparser(subparsers, module, name):
@@ -77,6 +87,7 @@ def main(raw_args=sys.argv[1:]):
     add_subparser(subparsers, list_command, "list")
     add_subparser(subparsers, reproduce, "reproduce")
     add_subparser(subparsers, config, "config")
+    add_subparser(subparsers, smoke_test, "smoke-test")
 
     # First identify the subparser as some subparser pass additional args to
     # the subparser and other not
