@@ -15,7 +15,7 @@
 import argparse
 import sys
 
-from comet_ml.exceptions import InvalidAPIKey
+from comet_ml.exceptions import Unauthorized
 
 from cometx.framework.comet import DownloadManager
 from cometx.utils import display_invalid_api_key
@@ -75,7 +75,7 @@ def list(parsed_args, remaining=None):
             list_items=True,
             query=parsed_args.query,
         )
-    except InvalidAPIKey as exc:
+    except Unauthorized as exc:
         if parsed_args.debug:
             raise exc from None
         else:

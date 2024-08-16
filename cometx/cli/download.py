@@ -188,7 +188,7 @@ def get_parser_arguments(parser):
 
 
 def download(parsed_args, remaining=None):
-    from comet_ml.exceptions import InvalidAPIKey
+    from comet_ml.exceptions import Unauthorized
 
     from ..framework.comet import DownloadManager
     from ..utils import display_invalid_api_key
@@ -226,7 +226,7 @@ def download(parsed_args, remaining=None):
             )
             print("Waiting on threaded downloads...")
             downloader.end()
-        except InvalidAPIKey:
+        except Unauthorized:
             display_invalid_api_key()
         except Exception as exc:
             if parsed_args.debug:
