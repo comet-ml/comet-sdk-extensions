@@ -1,9 +1,17 @@
-# Migrating Projects/Experiments between Comet Instances
+# Migrating Projects/Experiments
 
-As described in the [README](README.md), you can configure `cometx` to connect
-to different Comet instances. This is useful when you want to migrate projects
-or experiments between different Comet instances. This document describes how
-to do this.
+As described in the [README](README.md), you can instruct `cometx` to
+download data from and copy data to:
+
+* experiment to experiment
+* project to project
+* workspace to workspace
+* Comet installation to Comet installation
+* WandB installation to Comet installation
+
+This is useful when you want to migrate projects or experiments
+between different Comet instances or to Comet from different
+vendors. This document describes how to do this.
 
 By default, `cometx` connects to the Comet Cloud SaaS instance, unless you have
 configured it to connect to a different Comet instance. If you want to migrate
@@ -11,21 +19,22 @@ projects or experiments between different Comet instances, you need to
 configure `cometx` to connect to the source and destination Comet instances.
 
 You can either change the configuration in the `cometx` configuration file
-(`~/.comet.config`) or use the `COMET_API_KEY` + `COMET_URL_OVERRIDE`
+(`~/.comet.config`) or use the `COMET_API_KEY` and `COMET_URL_OVERRIDE`
 environment variables to specify the source and destination Comet instances.
 But you must ensure to either update the configuration file or change the
 environment variables between the source and destination Comet instances before
-uploading data to the destination, so that `cometx` connects to the correct
+compying data to the destination, so that `cometx` connects to the correct
 Comet instance. This is because only one Comet instance can be configured at a
 time.
 
 ## Migrating
 
 Migrating your data is a two step process. First you must download the data
-from the source Comet instance, and then upload it to the destination Comet
-instance.
+from the source, and then copy it to the destination Comet instance.
 
 ### Downloading Data
+
+The first step in a migration is to use `comet download`. For example:
 
 ```shell
 COMET_URL_OVERRIDE=http://comet.a.com/clientlib \
@@ -35,24 +44,25 @@ cometx download <WORKSPACE>/<PROJECT>
 
 The `cometx download` subcommand downloads all of the Comet experiment
 data into local files. Note that `<WORKSPACE>/<PROJECT>` refers to a
-workspace and project on `http://comet.a.com`.
+workspace and project on `http://comet.a.com`. This command will
+create a folder in the filesystem with the same name:
+`<WORKSPACE>/<PROJECT>`.
 
 ##### Downloading a Single Experiment
 
-If you want to download a single experiment, you can specify the experiment ID
-in addition to the project name:
+If you want to download a single experiment, you can specify the
+experiment ID or experiment name in addition to the project name:
 
 ```shell
 COMET_URL_OVERRIDE=http://comet.a.com/clientlib \
 COMET_API_KEY=A-KEY \
-cometx download <WORKSPACE>/<PROJECT>/<EXPERIMENT_ID>
+cometx download <WORKSPACE>/<PROJECT>/<EXPERIMENT_ID_OR_NAME>
 ```
-
-Instead using the ID you may also use the project name.
 
 ##### Downloading an Entire Workspace
 
-You can also omit the project name to download an entire workspace:
+You can also omit the project name to download all of the projects in
+a workspace:
 
 ```shell
 COMET_URL_OVERRIDE=http://comet.a.com/clientlib \
@@ -85,11 +95,37 @@ Where `[RESOURCE ...]` is zero or more of the following names:
 
 If no `RESOURCE` is given it will download all of them.
 
-### Uploading Data
+#### Downloading from other Vendors
 
-The `download` subcommand will create a directory with the same name as the
-project in the current working directory. You can then use the `copy`
-subcommand to upload the data to the destination Comet instance.
+You can also download data from other vendors using the `--from`
+flag. Currently, `cometx` supports:
+
+* `--from wandb`
+
+Note that you need to be logged into wandb before downloading your
+data.
+
+For example:
+
+```shell
+cometx download --from wandb stacey/yolo-drive/1dwb18ia
+```
+
+This will download the WandB run: https://wandb.ai/stacey/yolo-drive/runs/1dwb18ia
+
+#### Additional Download Flags
+
+These flags may be useful:
+
+* `--ovewrite` - overwrite any existing files
+* `--force` - don't ask to download, just do it
+
+### Copying Data
+
+As noted above, the `download` subcommand will create a directory with
+the same name as the project in the current working directory. You can
+then use the `copy` subcommand to upload the data to the destination
+Comet instance.
 
 ```shell
 COMET_URL_OVERRIDE=http://comet.b.com/clientlib \
@@ -97,23 +133,29 @@ COMET_API_KEY=B-KEY \
 cometx copy <WORKSPACE>/<PROJECT> <NEW-WORKSPACE>/<NEW-PROJECT>
 ```
 
-Note that `<WORKSPACE>/<PROJECT>` now refers to a directory, and
-`<NEW-WORKSPACE>/<NEW-PROJECT>` refers to a workspace and project on
-`http://comet.b.com`.
+Notice that we are using a different `COMET_URL_OVERRIDE` value than
+before. This allows us to copy the downloaded data to a different
+Comet installation.
 
-##### Uploading a Single Experiment
+Also note that `<WORKSPACE>/<PROJECT>` now refers to a directory, and
+`<NEW-WORKSPACE>/<NEW-PROJECT>` refers to a workspace and project on
+`http://comet.b.com`. The old and new workspaces and projects can be
+the same. No experiment data will ever be overwritten, but rather new
+experiments are always created.
+
+##### Copying a Single Experiment
 
 You can similarly copy a single experiment:
 
 ```shell
 COMET_URL_OVERRIDE=http://comet.b.com/clientlib \
 COMET_API_KEY=B-KEY \
-cometx copy <WORKSPACE>/<PROJECT>/<EXPERIMENT_ID> <NEW-WORKSPACE>/<NEW-PROJECT>
+cometx copy <WORKSPACE>/<PROJECT>/<EXPERIMENT_ID_OR_NAME> <NEW-WORKSPACE>/<NEW-PROJECT>
 ```
 
 Note the absence of the experiment ID in the destination path.
 
-##### Uploading an Entire Workspace
+##### Copy an Entire Workspace
 
 As well as uploading an entire workspace:
 
