@@ -21,6 +21,7 @@ $ cometx smoke-test WORKSPACE/PROJECT
 import argparse
 import os
 import sys
+import time
 from typing import Optional
 
 from comet_ml import API, APIExperiment, Experiment, Optimizer
@@ -65,15 +66,18 @@ def test_experiment(
         image_path (str, optional): image_path
         file_path (str, optional): file_path
     """
+    print("    Attempting to create an experiment...")
     experiment = Experiment(workspace=workspace, project_name=project_name)
     key = experiment.get_key()
     experiment.set_name("header test")
     # Types:
     # Dataset info:
+    print("    Attempting to log a dataset...")
     experiment.log_dataset_info(
         name="test dataset", version="test1", path="/test/file/path"
     )
     # Metrics:
+    print("    Attempting to log metrics...")
     experiment.log_metric("int_metric", 42.5, step=0)
     experiment.log_metrics(
         {
@@ -85,11 +89,15 @@ def test_experiment(
     )
     # Image:
     if image_path:
+        print("    Attempting to log an image...")
         experiment.log_image(image_path)
     # Assets:
     if file_path:
+        print("    Attempting to log an asset...")
         experiment.log_asset(file_path)
+    print("    Attempting to upload experiment...")
     experiment.end()
+    print("Done!")
     return key
 
 
@@ -135,17 +143,17 @@ def smoke_test(parsed_args, remaning=None) -> None:
     Runs the smoke tests.
     """
     # Use API to get API Key and URL (includes smart key usage)
-    api = API()
+    api = API(cache=False)
 
     comet_base_url = api.config["comet.url_override"]
     if comet_base_url.endswith("/"):
         comet_base_url = comet_base_url[:-1]
     if comet_base_url.endswith("/clientlib"):
-        comet_base_url = comet_base_url[:10]
-
-    os.environ["COMET_OPTIMIZER_URL"] = comet_base_url + "/optimizer/"
+        comet_base_url = comet_base_url[:-10]
 
     workspace, project_name = parsed_args.COMET_PATH.split("/", 1)
+    print("Running cometx smoke tests...")
+    print("Using %s/%s on %s" % (workspace, project_name, comet_base_url))
 
     # Test Experiment
     key = test_experiment(
@@ -157,23 +165,35 @@ def smoke_test(parsed_args, remaning=None) -> None:
     experiment = APIExperiment(
         previous_experiment=key,
     )
-    metric = experiment.get_metrics("int_metric")
-    if "metricName" in metric[0] and metric[0]["metricValue"] == "42.5":
-        print("\nSuccessfully validated metric presence\n")
-    else:
-        print("\nSomething is wrong\n")
+
+    if "metric" not in parsed_args.exclude:
+        metric = experiment.get_metrics("int_metric")
+        while len(metric) == 0 or "metricName" not in metric[0]:
+            print("Waiting on metrics to finish processing...")
+            time.sleep(5)
+            metric = experiment.get_metrics("int_metric")
+
+        if "metricName" in metric[0] and metric[0]["metricValue"] == "42.5":
+            print("\nSuccessfully validated metric presence\n")
+        else:
+            print("\nSomething is wrong\n")
 
     # Optimizer
     if "optimizer" not in parsed_args.exclude:
+        print("    Attempting to run optimizer...")
+        os.environ["COMET_OPTIMIZER_URL"] = comet_base_url + "/optimizer/"
         test_optimizer(
             workspace=workspace,
             project_name=project_name,
         )
 
+    print("All tests have passed!")
+
 
 def main(args):
+    formatter_class = argparse.RawDescriptionHelpFormatter
     parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+        description=__doc__, formatter_class=formatter_class
     )
     get_parser_arguments(parser)
     parsed_args = parser.parse_args(args)

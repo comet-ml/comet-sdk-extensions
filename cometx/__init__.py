@@ -13,6 +13,8 @@
 
 import os
 
+from comet_ml import login  # noqa
+
 # To keep comet_ml logger silent:
 os.environ["COMET_LOGGING_CONSOLE"] = "CRITICAL"
 
