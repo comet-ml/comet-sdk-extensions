@@ -24,7 +24,7 @@ import sys
 import time
 from typing import Optional
 
-from comet_ml import API, APIExperiment, Experiment, Optimizer
+from comet_ml import API, Experiment, Optimizer
 
 ADDITIONAL_ARGS = False
 
@@ -83,7 +83,6 @@ def test_experiment(
         {
             "dict_metric_str": "foo",
             "dict_metric_int": 33,
-            "dict_metric_bool": True,
         },
         step=0,
     )
@@ -162,9 +161,7 @@ def smoke_test(parsed_args, remaning=None) -> None:
         parsed_args.image,
         parsed_args.asset,
     )
-    experiment = APIExperiment(
-        previous_experiment=key,
-    )
+    experiment = api.get_experiment_by_key(key)
 
     if "metric" not in parsed_args.exclude:
         metric = experiment.get_metrics("int_metric")
