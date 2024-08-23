@@ -33,6 +33,8 @@ Items:
 * optimizer
 * mpm
 * experiment
+* image
+* asset
 """
 import argparse
 import csv
@@ -43,7 +45,7 @@ import sys
 import tempfile
 import time
 import uuid
-from typing import Optional
+from typing import List, Optional
 
 from comet_ml import API, Experiment, Optimizer
 
@@ -59,32 +61,58 @@ def get_parser_arguments(parser):
     parser.add_argument(
         "include",
         help=(
-            "Items to include (optional, default is optimizer, mpm, metric, experiment)"
+            "Items to include (optional, default is optimizer, mpm, metric, experiment, image, asset)"
         ),
         nargs="*",
         default=[],
     )
     parser.add_argument(
         "--exclude",
-        help=("Items to exclude (optimizer, mpm, metric, experiment)"),
+        help=("Items to exclude (optimizer, mpm, metric, experiment, image, asset)"),
         nargs="*",
         default=[],
-    )
-    parser.add_argument(
-        "--image",
-        help=("Path to image"),
-        type=str,
-    )
-    parser.add_argument(
-        "--asset",
-        help=("Path to asset file"),
-        type=str,
     )
     parser.add_argument(
         "--debug",
         help=("Show debugging information"),
         default=False,
     )
+
+
+def _create_image(
+    text,
+    height=50,
+    margin=None,
+    color=(255, 255, 255),
+    background_color=(0, 0, 0),
+    randomness=0,
+):
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+    except ImportError:
+        raise ImportError(
+            "pillow not installed; run `pip install pillow` to install it"
+        ) from None
+
+    font = ImageFont.load_default(size=height)
+    (0, 12, 112, 50)
+    x, y, width, height = font.getbbox(text)
+    margin = margin if margin is not None else int(height / 5)
+    image = Image.new(
+        "RGB", (width + margin * 2, height + margin * 2), background_color
+    )
+    draw = ImageDraw.Draw(image)
+    fudge = int(height * (7 / 50))
+    draw.text((margin, margin - fudge), text, color, font=font)
+    for i in range(randomness):
+        draw.point(
+            (
+                random.randint(0, width + margin * 2),
+                random.randint(0, height + margin * 2),
+            ),
+            fill=color,
+        )
+    return image
 
 
 def _log_mpm_events(MPM: any, nb_events: int, days: int) -> None:
@@ -161,7 +189,7 @@ def test_mpm(workspace: str, model_name: str, nb_events: int, days: int):
     except ImportError:
         raise ImportError(
             "comet_mpm not installed; run `pip install comet-mpm` to install it"
-        )
+        ) from None
 
     MPM = comet_mpm.CometMPM(
         workspace_name=workspace,
@@ -181,47 +209,57 @@ def test_mpm(workspace: str, model_name: str, nb_events: int, days: int):
 
 
 def test_experiment(
+    includes: List[str],
     workspace: str,
     project_name: str,
     name: str,
-    image_path: Optional[str] = None,
-    file_path: Optional[str] = None,
 ):
     """
     Args:
         workspace (str): workspace name
         project_name (str): project_name
-        image_path (str, optional): image_path
-        file_path (str, optional): file_path
     """
     print("    Attempting to create an experiment...")
     experiment = Experiment(workspace=workspace, project_name=project_name)
     key = experiment.get_key()
     experiment.set_name(name)
-    # Types:
-    # Dataset info:
-    print("    Attempting to log a dataset...")
-    experiment.log_dataset_info(
-        name="test dataset", version="test1", path="/test/file/path"
-    )
-    # Metrics:
-    print("    Attempting to log metrics...")
-    experiment.log_metric("int_metric", 42.5, step=0)
-    experiment.log_metrics(
-        {
-            "dict_metric_str": "foo",
-            "dict_metric_int": 33,
-        },
-        step=0,
-    )
-    # Image:
-    if image_path:
+
+    if "dataset-info" in includes:
+        # Dataset info:
+        print("    Attempting to log a dataset...")
+        experiment.log_dataset_info(
+            name="mnist", version="1.6.8", path="/opt/share/datasets/mnist.db"
+        )
+
+    if "metric" in includes:
+        print("    Attempting to log metrics...")
+        for step in range(100):
+            experiment.log_metric("accuracy", random.random() * step, step=step)
+            experiment.log_metric("loss", 100 - (random.random() * step), step=step)
+
+    if "image" in includes:
         print("    Attempting to log an image...")
-        experiment.log_image(image_path)
-    # Assets:
-    if file_path:
+        image = _create_image("smoke-test")
+        experiment.log_image(image, "smoke-test-image.png", step=0)
+
+    if "asset" in includes:
         print("    Attempting to log an asset...")
-        experiment.log_asset(file_path)
+        data = {
+            "key1": 1,
+            "key2": {
+                "key2-1": 1.1,
+                "key2-2": 1.2,
+            },
+        }
+        experiment.log_asset_data(data, "smoke-test.json")
+
+    if "confusion-matrix" in includes:
+        print("    Attempting to log a confusion matrix...")
+        y_true = [(i % 10) for i in range(500)]
+        y_predicted = [random.randint(0, 9) for i in range(500)]
+        images = [_create_image(str(n), margin=30, randomness=30) for n in y_true]
+        experiment.log_confusion_matrix(y_true, y_predicted, images=images, step=0)
+
     print("    Attempting to upload experiment...")
     experiment.end()
     print("Done!")
@@ -281,11 +319,15 @@ def smoke_test(parsed_args, remaning=None) -> None:
     includes = (
         parsed_args.include
         if parsed_args.include
-        else ["mpm", "optimizer", "metric", "experiment"]
+        else ["mpm", "optimizer", "experiment"]
     )
     for item in parsed_args.exclude:
         if item in includes:
             includes.remove(item)
+    # Handle subitems:
+    for item in ["image", "asset", "metric", "dataset-info", "confusion-matrix"]:
+        if item not in parsed_args.exclude and "experiment" in includes:
+            includes.append(item)
 
     workspace, project_name = parsed_args.COMET_PATH.split("/", 1)
     print("Running cometx smoke tests...")
@@ -296,22 +338,21 @@ def smoke_test(parsed_args, remaning=None) -> None:
         project_data = api.get_project(workspace, project_name) or {}
         # Test Experiment
         key = test_experiment(
+            includes,
             workspace,
             project_name,
             "test-%s" % (project_data.get("numberOfExperiments", 0) + 1),
-            parsed_args.image,
-            parsed_args.asset,
         )
         experiment = api.get_experiment_by_key(key)
 
         if "metric" in includes:
-            metric = experiment.get_metrics("int_metric")
+            metric = experiment.get_metrics("loss")
             while len(metric) == 0 or "metricName" not in metric[0]:
                 print("Waiting on metrics to finish processing...")
                 time.sleep(5)
-                metric = experiment.get_metrics("int_metric")
+                metric = experiment.get_metrics("loss")
 
-            if "metricName" in metric[0] and metric[0]["metricValue"] == "42.5":
+            if "metricName" in metric[0] and metric[0]["metricValue"]:
                 print("\nSuccessfully validated metric presence\n")
             else:
                 print("\nSomething is wrong\n")
