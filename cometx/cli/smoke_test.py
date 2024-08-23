@@ -45,7 +45,7 @@ import sys
 import tempfile
 import time
 import uuid
-from typing import List, Optional
+from typing import List
 
 from comet_ml import API, Experiment, Optimizer
 
