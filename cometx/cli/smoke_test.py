@@ -16,12 +16,32 @@ Example:
 
 Perform a smoke test on a Comet installation
 
+Run all tests:
 $ cometx smoke-test WORKSPACE/PROJECT
+
+Run everything except mpm tests:
+$ cometx smoke-test WORKSPACE/PROJECT --exclude mpm
+
+Run just optimizer tests:
+$ cometx smoke-test WORKSPACE/PROJECT optimizer
+
+Run just metric tests:
+$ cometx smoke-test WORKSPACE/PROJECT metric
+
+Items:
+* metric
+* optimizer
+* mpm
 """
 import argparse
+import csv
+import datetime
 import os
+import random
 import sys
+import tempfile
 import time
+import uuid
 from typing import Optional
 
 from comet_ml import API, Experiment, Optimizer
@@ -36,8 +56,14 @@ def get_parser_arguments(parser):
         type=str,
     )
     parser.add_argument(
+        "include",
+        help=("Items to include (optional, default is optimizer, mpm, metric)"),
+        nargs="?",
+        default=[],
+    )
+    parser.add_argument(
         "--exclude",
-        help=("Items to exclude (optimizer)"),
+        help=("Items to exclude (optimizer, mpm, metric)"),
         nargs="*",
         default=[],
     )
@@ -51,6 +77,97 @@ def get_parser_arguments(parser):
         help=("Path to asset file"),
         type=str,
     )
+
+
+def _log_mpm_events(MPM: any, nb_events: int = 1000, days: int = 7) -> None:
+    # Create test data
+    end_date = datetime.datetime.now(datetime.timezone.utc)
+    start_date = end_date - datetime.timedelta(days=days)
+    timestamps = sorted(
+        [
+            start_date
+            + datetime.timedelta(seconds=random.randint(0, days * 24 * 60 * 60))
+            for _ in range(nb_events)
+        ]
+    )
+
+    for ts in timestamps:
+        data_point = {
+            "prediction_id": str(uuid.uuid4()),
+            "timestamp": int(ts.timestamp()),
+            "input_features": {
+                "numerical_feature": random.uniform(0, 100),
+                "categorical_feature": random.choice(["a", "b", "c"]),
+            },
+            "output_features": {
+                "value": random.choice([True, False]),
+                "probability": random.uniform(0, 1),
+            },
+            "labels": {"label": random.choice([True, False])},
+        }
+        # Log the test data to MPM
+        MPM.log_event(**data_point)
+
+
+def _log_mpm_training_distribution(MPM: any, nb_events: int = 10000) -> None:
+    # Create training distribution
+    header = [
+        "feature_numerical_feature",
+        "feature_categorical_feature",
+        "prediction_value",
+        "prediction_probability",
+        "label_value_label",
+    ]
+
+    with tempfile.NamedTemporaryFile("w", suffix=".csv", newline="") as fp:
+        writer = csv.writer(fp)
+        writer.writerow(header)
+        for _ in range(nb_events):
+            row = [
+                random.uniform(0, 100),
+                random.choices(["a", "b", "c"], [0.1, 0.2, 0.7]),
+                random.choice([True, False]),
+                random.uniform(0, 1),
+                random.choice([True, False]),
+            ]
+            writer.writerow(row)
+
+        # Log the training distribution to MPM
+        MPM.upload_dataset_csv(
+            file_path=fp.name,
+            dataset_type="TRAINING_EVENTS",
+            dataset_name="training_dataset",
+        )
+
+
+def test_mpm(workspace: str, model_name: str, nb_events: int = 1000, days: int = 7):
+    """
+    Args:
+        workspace (str): workspace
+        model_name (str): model_name
+    """
+    try:
+        import comet_mpm
+    except ImportError:
+        raise ImportError(
+            "comet_mpm not installed; run `pip install comet-mpm` to install it"
+        )
+
+    MPM = comet_mpm.CometMPM(
+        workspace_name=workspace,
+        model_name=model_name,
+        model_version="1.0.0",
+        max_batch_time=1,
+    )
+
+    # Log MPM events
+    _log_mpm_events(MPM, nb_events, days)
+
+    # Log MPM training distribution
+    _log_mpm_training_distribution(MPM, nb_events)
+
+    # Call .end() method to make sure all data is logged to the platform
+    MPM.end()
 
 
 def test_experiment(
@@ -150,6 +267,13 @@ def smoke_test(parsed_args, remaning=None) -> None:
     if comet_base_url.endswith("/clientlib"):
         comet_base_url = comet_base_url[:-10]
 
+    includes = (
+        parsed_args.include if parsed_args.include else ["mpm", "optimizer", "metric"]
+    )
+    for item in parsed_args.exclude:
+        if item in includes:
+            includes.remove(item)
+
     workspace, project_name = parsed_args.COMET_PATH.split("/", 1)
     print("Running cometx smoke tests...")
     print("Using %s/%s on %s" % (workspace, project_name, comet_base_url))
@@ -163,7 +287,7 @@ def smoke_test(parsed_args, remaning=None) -> None:
     )
     experiment = api.get_experiment_by_key(key)
 
-    if "metric" not in parsed_args.exclude:
+    if "metric" in includes:
         metric = experiment.get_metrics("int_metric")
         while len(metric) == 0 or "metricName" not in metric[0]:
             print("Waiting on metrics to finish processing...")
@@ -175,16 +299,27 @@ def smoke_test(parsed_args, remaning=None) -> None:
         else:
             print("\nSomething is wrong\n")
 
-    # Optimizer
-    if "optimizer" not in parsed_args.exclude:
+    if "optimizer" in includes:
         print("    Attempting to run optimizer...")
         os.environ["COMET_OPTIMIZER_URL"] = comet_base_url + "/optimizer/"
         test_optimizer(
             workspace=workspace,
             project_name=project_name,
         )
+        print(
+            "\nCompleted Optimizer test, you will need to check the Comet UI to ensure all the data has been correctly logged.\n"
+        )
 
-    print("All tests have passed!")
+    if "mpm" in includes:
+        print("    Attempting to run mpm tests...")
+        test_mpm(workspace, project_name)
+
+        comet_mpm_ui_url = comet_base_url + f"/{workspace}#model-production-monitoring"
+        print(
+            f"\nCompleted MPM test, you will need to check the MPM UI ({comet_mpm_ui_url}) to validate the data has been logged, this can take up to 5 minutes.\n"
+        )
+
+    print("All tests have completed")
 
 
 def main(args):
