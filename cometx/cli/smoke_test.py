@@ -146,7 +146,7 @@ def _log_mpm_training_distribution(MPM: any, nb_events: int) -> None:
         MPM.upload_dataset_csv(
             file_path=fp.name,
             dataset_type="TRAINING_EVENTS",
-            dataset_name="training_dataset",
+            dataset_name="training_dataset-%s" % random.randint(100000, 999999),
         )
 
 
