@@ -32,6 +32,7 @@ Items:
 * metric
 * optimizer
 * mpm
+* experiment
 """
 import argparse
 import csv
@@ -57,13 +58,15 @@ def get_parser_arguments(parser):
     )
     parser.add_argument(
         "include",
-        help=("Items to include (optional, default is optimizer, mpm, metric)"),
-        nargs="?",
+        help=(
+            "Items to include (optional, default is optimizer, mpm, metric, experiment)"
+        ),
+        nargs="*",
         default=[],
     )
     parser.add_argument(
         "--exclude",
-        help=("Items to exclude (optimizer, mpm, metric)"),
+        help=("Items to exclude (optimizer, mpm, metric, experiment)"),
         nargs="*",
         default=[],
     )
@@ -77,9 +80,14 @@ def get_parser_arguments(parser):
         help=("Path to asset file"),
         type=str,
     )
+    parser.add_argument(
+        "--debug",
+        help=("Show debugging information"),
+        default=False,
+    )
 
 
-def _log_mpm_events(MPM: any, nb_events: int = 1000, days: int = 7) -> None:
+def _log_mpm_events(MPM: any, nb_events: int, days: int) -> None:
     # Create test data
     end_date = datetime.datetime.now(datetime.timezone.utc)
     start_date = end_date - datetime.timedelta(days=days)
@@ -109,7 +117,7 @@ def _log_mpm_events(MPM: any, nb_events: int = 1000, days: int = 7) -> None:
         MPM.log_event(**data_point)
 
 
-def _log_mpm_training_distribution(MPM: any, nb_events: int = 10000) -> None:
+def _log_mpm_training_distribution(MPM: any, nb_events: int) -> None:
     # Create training distribution
     header = [
         "feature_numerical_feature",
@@ -125,12 +133,14 @@ def _log_mpm_training_distribution(MPM: any, nb_events: int = 10000) -> None:
         for _ in range(nb_events):
             row = [
                 random.uniform(0, 100),
-                random.choices(["a", "b", "c"], [0.1, 0.2, 0.7]),
+                random.choices(["a", "b", "c"], [0.1, 0.2, 0.7])[0],
                 random.choice([True, False]),
                 random.uniform(0, 1),
                 random.choice([True, False]),
             ]
             writer.writerow(row)
+
+        fp.flush()
 
         # Log the training distribution to MPM
         MPM.upload_dataset_csv(
@@ -140,7 +150,7 @@ def _log_mpm_training_distribution(MPM: any, nb_events: int = 10000) -> None:
         )
 
 
-def test_mpm(workspace: str, model_name: str, nb_events: int = 1000, days: int = 7):
+def test_mpm(workspace: str, model_name: str, nb_events: int, days: int):
     """
     Args:
         workspace (str): workspace
@@ -173,6 +183,7 @@ def test_mpm(workspace: str, model_name: str, nb_events: int = 1000, days: int =
 def test_experiment(
     workspace: str,
     project_name: str,
+    name: str,
     image_path: Optional[str] = None,
     file_path: Optional[str] = None,
 ):
@@ -186,7 +197,7 @@ def test_experiment(
     print("    Attempting to create an experiment...")
     experiment = Experiment(workspace=workspace, project_name=project_name)
     key = experiment.get_key()
-    experiment.set_name("header test")
+    experiment.set_name(name)
     # Types:
     # Dataset info:
     print("    Attempting to log a dataset...")
@@ -268,7 +279,9 @@ def smoke_test(parsed_args, remaning=None) -> None:
         comet_base_url = comet_base_url[:-10]
 
     includes = (
-        parsed_args.include if parsed_args.include else ["mpm", "optimizer", "metric"]
+        parsed_args.include
+        if parsed_args.include
+        else ["mpm", "optimizer", "metric", "experiment"]
     )
     for item in parsed_args.exclude:
         if item in includes:
@@ -278,26 +291,30 @@ def smoke_test(parsed_args, remaning=None) -> None:
     print("Running cometx smoke tests...")
     print("Using %s/%s on %s" % (workspace, project_name, comet_base_url))
 
-    # Test Experiment
-    key = test_experiment(
-        workspace,
-        project_name,
-        parsed_args.image,
-        parsed_args.asset,
-    )
-    experiment = api.get_experiment_by_key(key)
+    if "experiment" in includes:
+        print("    Attempting to log experiment...")
+        project_data = api.get_project(workspace, project_name) or {}
+        # Test Experiment
+        key = test_experiment(
+            workspace,
+            project_name,
+            "test-%s" % (project_data.get("numberOfExperiments", 0) + 1),
+            parsed_args.image,
+            parsed_args.asset,
+        )
+        experiment = api.get_experiment_by_key(key)
 
-    if "metric" in includes:
-        metric = experiment.get_metrics("int_metric")
-        while len(metric) == 0 or "metricName" not in metric[0]:
-            print("Waiting on metrics to finish processing...")
-            time.sleep(5)
+        if "metric" in includes:
             metric = experiment.get_metrics("int_metric")
+            while len(metric) == 0 or "metricName" not in metric[0]:
+                print("Waiting on metrics to finish processing...")
+                time.sleep(5)
+                metric = experiment.get_metrics("int_metric")
 
-        if "metricName" in metric[0] and metric[0]["metricValue"] == "42.5":
-            print("\nSuccessfully validated metric presence\n")
-        else:
-            print("\nSomething is wrong\n")
+            if "metricName" in metric[0] and metric[0]["metricValue"] == "42.5":
+                print("\nSuccessfully validated metric presence\n")
+            else:
+                print("\nSomething is wrong\n")
 
     if "optimizer" in includes:
         print("    Attempting to run optimizer...")
@@ -312,7 +329,7 @@ def smoke_test(parsed_args, remaning=None) -> None:
 
     if "mpm" in includes:
         print("    Attempting to run mpm tests...")
-        test_mpm(workspace, project_name)
+        test_mpm(workspace, project_name, nb_events=10, days=7)
 
         comet_mpm_ui_url = comet_base_url + f"/{workspace}#model-production-monitoring"
         print(
