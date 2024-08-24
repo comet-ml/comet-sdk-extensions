@@ -29,12 +29,15 @@ Run just metric tests:
 $ cometx smoke-test WORKSPACE/PROJECT metric
 
 Items:
-* metric
 * optimizer
 * mpm
 * experiment
-* image
-* asset
+  * metric
+  * image
+  * asset
+  * dataset-info
+  * confusion-matrix
+  * embedding
 """
 import argparse
 import csv
@@ -50,6 +53,22 @@ from typing import List
 from comet_ml import API, Experiment, Optimizer
 
 ADDITIONAL_ARGS = False
+RESOURCES = {
+    "experiment": [
+        "image",
+        "asset",
+        "metric",
+        "dataset-info",
+        "confusion-matrix",
+        "embedding",
+    ],
+    "optimizer": [],
+    "mpm": [],
+}
+RESOURCES_ALL = sorted(
+    list(RESOURCES.keys()) + [value for v in RESOURCES.values() for value in v]
+)
+RESOURCES_ALL_STR = ", ".join(RESOURCES_ALL)
 
 
 def get_parser_arguments(parser):
@@ -60,15 +79,13 @@ def get_parser_arguments(parser):
     )
     parser.add_argument(
         "include",
-        help=(
-            "Items to include (optional, default is optimizer, mpm, metric, experiment, image, asset)"
-        ),
+        help=(f"Items to include; leave out for all, or any of: {RESOURCES_ALL_STR}"),
         nargs="*",
         default=[],
     )
     parser.add_argument(
         "--exclude",
-        help=("Items to exclude (optimizer, mpm, metric, experiment, image, asset)"),
+        help=(f"Items to exclude; any of: {RESOURCES_ALL_STR}"),
         nargs="*",
         default=[],
     )
@@ -79,6 +96,29 @@ def get_parser_arguments(parser):
     )
 
 
+def _hex_to_rgb(hex_color):
+    """
+    Converts a hex color string to an RGB tuple.
+    """
+    hex_color = hex_color.lstrip("#")
+    r = int(hex_color[0:2], 16)
+    g = int(hex_color[2:4], 16)
+    b = int(hex_color[4:6], 16)
+    return (r, g, b)
+
+
+def _get_vector_from_image(image):
+    """
+    Get a vector from an image
+    """
+    vector = [
+        image.getpixel((x, y))[0]
+        for x in range(image.width)
+        for y in range(image.height)
+    ]
+    return vector
+
+
 def _create_image(
     text,
     height=50,
@@ -86,6 +126,7 @@ def _create_image(
     color=(255, 255, 255),
     background_color=(0, 0, 0),
     randomness=0,
+    width=None,
 ):
     try:
         from PIL import Image, ImageDraw, ImageFont
@@ -95,11 +136,12 @@ def _create_image(
         ) from None
 
     font = ImageFont.load_default(size=height)
-    (0, 12, 112, 50)
-    x, y, width, height = font.getbbox(text)
+    if width is None:
+        x, y, font_width, font_height = font.getbbox(text)
+        width = font_width
     margin = margin if margin is not None else int(height / 5)
     image = Image.new(
-        "RGB", (width + margin * 2, height + margin * 2), background_color
+        "RGBA", (width + margin * 2, height + margin * 2), background_color
     )
     draw = ImageDraw.Draw(image)
     fudge = int(height * (7 / 50))
@@ -239,7 +281,7 @@ def test_experiment(
 
     if "image" in includes:
         print("    Attempting to log an image...")
-        image = _create_image("smoke-test")
+        image = _create_image("smoke-test", background_color="red")
         experiment.log_image(image, "smoke-test-image.png", step=0)
 
     if "asset" in includes:
@@ -259,6 +301,50 @@ def test_experiment(
         y_predicted = [random.randint(0, 9) for i in range(500)]
         images = [_create_image(str(n), margin=30, randomness=30) for n in y_true]
         experiment.log_confusion_matrix(y_true, y_predicted, images=images, step=0)
+
+    if "embedding" in includes:
+        print("    Attempting to log embedding...")
+        labels = [str(i % 10) for i in range(100)]
+        images = [
+            _create_image(label, margin=0, randomness=30, width=30) for label in labels
+        ]
+        vectors = [_get_vector_from_image(image) for image in images]
+        tables = [["label", "index", "score"]] + [
+            [label, index, random.random()] for index, label in enumerate(labels)
+        ]
+
+        def get_color(index):
+            label = str(index % 10)
+            if label == "0":
+                return _hex_to_rgb("#8b0000")  # darkred
+            elif label == "1":
+                return _hex_to_rgb("#0000ff")  # blue
+            elif label == "2":
+                return _hex_to_rgb("#008000")  # green
+            elif label == "3":
+                return _hex_to_rgb("#483d8b")  # darkslateblue
+            elif label == "4":
+                return _hex_to_rgb("#b8860b")  # darkgoldenrod
+            elif label == "5":
+                return _hex_to_rgb("#ff1493")  # deeppink
+            elif label == "6":
+                return _hex_to_rgb("#b22222")  # firebrick
+            elif label == "7":
+                return _hex_to_rgb("#228b22")  # forestgreen
+            elif label == "8":
+                return _hex_to_rgb("#8fbc8f")  # darkseagreen
+            elif label == "9":
+                return _hex_to_rgb("#9400d3")  # darkviolet
+
+        experiment.log_embedding(
+            vectors,
+            tables,
+            image_data=images,
+            image_size=(30, 50),
+            image_transparent_color=(0, 0, 0),
+            image_background_color_function=get_color,
+            title="Comet Embedding",
+        )
 
     print("    Attempting to upload experiment...")
     experiment.end()
@@ -316,24 +402,23 @@ def smoke_test(parsed_args, remaning=None) -> None:
     if comet_base_url.endswith("/clientlib"):
         comet_base_url = comet_base_url[:-10]
 
-    includes = (
-        parsed_args.include
-        if parsed_args.include
-        else ["mpm", "optimizer", "experiment"]
-    )
+    includes = parsed_args.include if parsed_args.include else list(RESOURCES.keys())
     for item in parsed_args.exclude:
         if item in includes:
             includes.remove(item)
     # Handle subitems:
-    for item in ["image", "asset", "metric", "dataset-info", "confusion-matrix"]:
-        if item not in parsed_args.exclude and "experiment" in includes:
-            includes.append(item)
+    for key in RESOURCES:
+        for item in RESOURCES[key]:
+            if item not in parsed_args.exclude and key in includes:
+                includes.append(item)
 
     workspace, project_name = parsed_args.COMET_PATH.split("/", 1)
     print("Running cometx smoke tests...")
     print("Using %s/%s on %s" % (workspace, project_name, comet_base_url))
 
-    if "experiment" in includes:
+    if "experiment" in includes or any(
+        value in includes for value in RESOURCES["experiment"]
+    ):
         print("    Attempting to log experiment...")
         project_data = api.get_project(workspace, project_name) or {}
         # Test Experiment
@@ -345,6 +430,7 @@ def smoke_test(parsed_args, remaning=None) -> None:
         )
         experiment = api.get_experiment_by_key(key)
 
+        # Verification
         if "metric" in includes:
             metric = experiment.get_metrics("loss")
             while len(metric) == 0 or "metricName" not in metric[0]:
@@ -357,7 +443,9 @@ def smoke_test(parsed_args, remaning=None) -> None:
             else:
                 print("\nSomething is wrong\n")
 
-    if "optimizer" in includes:
+    if "optimizer" in includes or any(
+        value in includes for value in RESOURCES["optimizer"]
+    ):
         print("    Attempting to run optimizer...")
         os.environ["COMET_OPTIMIZER_URL"] = comet_base_url + "/optimizer/"
         test_optimizer(
@@ -368,7 +456,7 @@ def smoke_test(parsed_args, remaning=None) -> None:
             "\nCompleted Optimizer test, you will need to check the Comet UI to ensure all the data has been correctly logged.\n"
         )
 
-    if "mpm" in includes:
+    if "mpm" in includes or any(value in includes for value in RESOURCES["mpm"]):
         print("    Attempting to run mpm tests...")
         test_mpm(workspace, project_name, nb_events=10, days=7)
 
