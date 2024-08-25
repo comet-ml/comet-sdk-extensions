@@ -12,11 +12,13 @@
 #      Team. All rights reserved.
 # ****************************************
 """
-Example:
+Perform a smoke test on a Comet installation. Logs
+results to WORKSPACE/smoke-tests or WORKSPACE/PROJECT.
 
-Perform a smoke test on a Comet installation
+Examples:
 
 Run all tests:
+$ cometx smoke-test WORKSPACE    # project defaults to smoke-tests
 $ cometx smoke-test WORKSPACE/PROJECT
 
 Run everything except mpm tests:
@@ -28,7 +30,8 @@ $ cometx smoke-test WORKSPACE/PROJECT optimizer
 Run just metric tests:
 $ cometx smoke-test WORKSPACE/PROJECT metric
 
-Items:
+Items to include or exclude:
+
 * optimizer
 * mpm
 * experiment
@@ -378,7 +381,10 @@ def test_optimizer(workspace: str, project_name: str):
     opt = Optimizer(optimizer_config)
     count = 0
     for experiment in opt.get_experiments(
-        workspace=workspace, project_name=project_name
+        workspace=workspace,
+        project_name=project_name,
+        log_env_details=False,
+        log_code=False,
     ):
         print("Trying:", experiment.params)
         loss = objective_function(experiment.params["x"])
@@ -412,7 +418,13 @@ def smoke_test(parsed_args, remaning=None) -> None:
             if item not in parsed_args.exclude and key in includes:
                 includes.append(item)
 
-    workspace, project_name = parsed_args.COMET_PATH.split("/", 1)
+    if "/" in parsed_args.COMET_PATH:
+        if parsed_args.COMET_PATH.count("/") != 1:
+            raise Exception("COMET_PATH should be WORKSPACE or WORKSPACE/PROJECT")
+        workspace, project_name = parsed_args.COMET_PATH.split("/", 1)
+    else:
+        workspace, project_name = parsed_args.COMET_PATH, "smoke-tests"
+
     print("Running cometx smoke tests...")
     print("Using %s/%s on %s" % (workspace, project_name, comet_base_url))
 
