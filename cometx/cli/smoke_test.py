@@ -41,10 +41,12 @@ Items to include or exclude:
   * dataset-info
   * confusion-matrix
   * embedding
+  * panel
 """
 import argparse
 import csv
 import datetime
+import glob
 import os
 import random
 import sys
@@ -53,7 +55,9 @@ import time
 import uuid
 from typing import List
 
-from comet_ml import API, Experiment, Optimizer
+from comet_ml import Experiment, Optimizer
+
+from cometx.api import API
 
 ADDITIONAL_ARGS = False
 RESOURCES = {
@@ -64,6 +68,7 @@ RESOURCES = {
         "dataset-info",
         "confusion-matrix",
         "embedding",
+        "panel",
     ],
     "optimizer": [],
     "mpm": [],
@@ -454,6 +459,12 @@ def smoke_test(parsed_args, remaning=None) -> None:
                 print("\nSuccessfully validated metric presence\n")
             else:
                 print("\nSomething is wrong\n")
+
+        if "panel" in includes:
+            print("    Attempting to upload panel...")
+            HERE = os.path.abspath(os.path.dirname(__file__))
+            for filename in glob.glob(os.path.join(HERE, "..", "panels/*.zip")):
+                api.upload_panel_zip(workspace, filename)
 
     if "optimizer" in includes or any(
         value in includes for value in RESOURCES["optimizer"]
