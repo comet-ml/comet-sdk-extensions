@@ -46,7 +46,6 @@ Items to include or exclude:
 import argparse
 import csv
 import datetime
-import glob
 import os
 import random
 import sys
@@ -465,11 +464,11 @@ def smoke_test(parsed_args, remaning=None) -> None:
                 print("\nSomething is wrong\n")
 
     if "panel" in includes:
-        print("    Attempting to upload panel...")
-        HERE = os.path.abspath(os.path.dirname(__file__))
-        for filename in glob.glob(os.path.join(HERE, "..", "panels/*.zip")):
-            print(f"        uploading {filename}...")
-            api.upload_panel_zip(workspace, filename)
+        print("    Attempting to upload smoke-test panel...")
+        api.upload_panel_url(
+            workspace,
+            "https://raw.githubusercontent.com/comet-ml/comet-examples/master/panels/SmokeTest.py",
+        )
 
     if "optimizer" in includes or any(
         value in includes for value in RESOURCES["optimizer"]

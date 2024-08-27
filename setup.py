@@ -53,7 +53,6 @@ setup_args = dict(
         "cometx.framework.comet",
         "cometx",
     ],
-    include_package_data=True,
     entry_points={"console_scripts": ["cometx = cometx.cli:main"]},
     python_requires=">=3.6",
     license="MIT License",

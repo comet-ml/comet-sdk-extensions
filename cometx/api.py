@@ -11,8 +11,10 @@
 #      Team. All rights reserved.
 # ****************************************
 
+import tempfile
 from typing import Any, Dict, List
 
+import requests
 from comet_ml import API
 
 from .panel_utils import create_panel_zip
@@ -122,6 +124,28 @@ class API(API):
         with open(filename, "wb") as fp:
             fp.write(results)
         return filename
+
+    def upload_panel_url(self, workspace, item):
+        """ """
+        # TODO:
+        # https://github.com/comet-ml/comet-examples/blob/master/panels/TensorboardProfileViewer.py
+        # turns into:
+        # https://raw.githubusercontent.com/comet-ml/comet-examples/master/panels/TensorboardProfileViewer.py
+        print("Downloading %r..." % item)
+        response = requests.get(item)
+        if item.endswith(".py"):
+            code = response.content.decode()
+            print("   Creating zipped code...")
+            filename = create_panel_zip(item, code)
+            print("   Uploading panel...")
+            self.upload_panel_zip(workspace, filename)
+        elif item.endswith(".zip"):
+            zipcontents = response.content
+            print("    Saving zip file...")
+            with tempfile.NamedTemporaryFile(suffix=".zip") as fp:
+                fp.write(zipcontents)
+                print("    Uploading panel...")
+                self.upload_panel_zip(workspace, fp.name)
 
     def upload_panel_code(self, workspace: str, panel_name: str, code: str) -> None:
         """

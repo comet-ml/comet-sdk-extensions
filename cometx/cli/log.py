@@ -43,9 +43,6 @@ import glob
 import json
 import os
 import sys
-import tempfile
-
-import requests
 
 from ..api import API
 from ..panel_utils import create_panel_zip
@@ -168,27 +165,10 @@ def log_cli(parsed_args):
     if parsed_args.type == "panel":
         for item in parsed_args.FILENAME:
             if item.startswith("http"):
-                # TODO:
-                # https://github.com/comet-ml/comet-examples/blob/master/panels/TensorboardProfileViewer.py
-                # turns into:
-                # https://raw.githubusercontent.com/comet-ml/comet-examples/master/panels/TensorboardProfileViewer.py
-                print("Downloading %r..." % item)
-                response = requests.get(item)
-                if item.endswith(".py"):
-                    code = response.content.decode()
-                    print("   Creating zipped code...")
-                    filename = create_panel_zip(item, code)
-                    print("   Uploading panel...")
-                    api.upload_panel_zip(workspace, filename)
-                elif item.endswith(".zip"):
-                    zipcontents = response.content
-                    print("    Saving zip file...")
-                    with tempfile.NamedTemporaryFile(suffix=".zip") as fp:
-                        fp.write(zipcontents)
-                        print("    Uploading panel...")
-                        api.upload_panel_zip(workspace, fp.name)
+                print("Uploading panel code from URL...")
+                api.upload_panel_url(workspace, item)
             elif item.endswith(".zip"):
-                print("Uploading panel...")
+                print("Uploading panel zip...")
                 api.upload_panel_zip(workspace, item)
             elif item.endswith(".py"):
                 print("Reading contents of zip file...")
@@ -200,6 +180,7 @@ def log_cli(parsed_args):
                 api.upload_panel_zip(workspace, filename)
             else:
                 raise Exception("Unknown panel type")
+
     elif parsed_args.type == "code":
         if not parsed_args.FILENAME:
             raise Exception("Logging `code` requires file(s) or folder(s)")
