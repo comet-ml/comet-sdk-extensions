@@ -228,7 +228,7 @@ def _log_mpm_training_distribution(MPM: any, nb_events: int) -> None:
         )
 
 
-def test_mpm(workspace: str, model_name: str, nb_events: int, days: int):
+def test_mpm(api, workspace: str, model_name: str, nb_events: int, days: int):
     """
     Args:
         workspace (str): workspace
@@ -246,6 +246,7 @@ def test_mpm(workspace: str, model_name: str, nb_events: int, days: int):
         model_name=model_name,
         model_version="1.0.0",
         max_batch_time=1,
+        api_key=api.config["comet.api_key"],
     )
 
     # Log MPM events
@@ -464,6 +465,7 @@ def smoke_test(parsed_args, remaning=None) -> None:
             print("    Attempting to upload panel...")
             HERE = os.path.abspath(os.path.dirname(__file__))
             for filename in glob.glob(os.path.join(HERE, "..", "panels/*.zip")):
+                print(f"        uploading {filename}...")
                 api.upload_panel_zip(workspace, filename)
 
     if "optimizer" in includes or any(
@@ -481,7 +483,7 @@ def smoke_test(parsed_args, remaning=None) -> None:
 
     if "mpm" in includes or any(value in includes for value in RESOURCES["mpm"]):
         print("    Attempting to run mpm tests...")
-        test_mpm(workspace, project_name, nb_events=10, days=7)
+        test_mpm(api, workspace, project_name, nb_events=10, days=7)
 
         comet_mpm_ui_url = comet_base_url + f"/{workspace}#model-production-monitoring"
         print(
