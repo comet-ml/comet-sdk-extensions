@@ -34,6 +34,7 @@ Items to include or exclude:
 
 * optimizer
 * mpm
+* panel
 * experiment
   * metric
   * image
@@ -41,7 +42,6 @@ Items to include or exclude:
   * dataset-info
   * confusion-matrix
   * embedding
-  * panel
 """
 import argparse
 import csv
@@ -68,10 +68,10 @@ RESOURCES = {
         "dataset-info",
         "confusion-matrix",
         "embedding",
-        "panel",
     ],
     "optimizer": [],
     "mpm": [],
+    "panel": [],
 }
 RESOURCES_ALL = sorted(
     list(RESOURCES.keys()) + [value for v in RESOURCES.values() for value in v]
@@ -431,6 +431,9 @@ def smoke_test(parsed_args, remaning=None) -> None:
     else:
         workspace, project_name = parsed_args.COMET_PATH, "smoke-tests"
 
+    if workspace not in api.get_workspaces():
+        raise Exception("workspace %r does not exist!" % workspace)
+
     print("Running cometx smoke tests...")
     print("Using %s/%s on %s" % (workspace, project_name, comet_base_url))
 
@@ -461,12 +464,12 @@ def smoke_test(parsed_args, remaning=None) -> None:
             else:
                 print("\nSomething is wrong\n")
 
-        if "panel" in includes:
-            print("    Attempting to upload panel...")
-            HERE = os.path.abspath(os.path.dirname(__file__))
-            for filename in glob.glob(os.path.join(HERE, "..", "panels/*.zip")):
-                print(f"        uploading {filename}...")
-                api.upload_panel_zip(workspace, filename)
+    if "panel" in includes:
+        print("    Attempting to upload panel...")
+        HERE = os.path.abspath(os.path.dirname(__file__))
+        for filename in glob.glob(os.path.join(HERE, "..", "panels/*.zip")):
+            print(f"        uploading {filename}...")
+            api.upload_panel_zip(workspace, filename)
 
     if "optimizer" in includes or any(
         value in includes for value in RESOURCES["optimizer"]
