@@ -77,6 +77,11 @@ RESOURCES_ALL = sorted(
 )
 RESOURCES_ALL_STR = ", ".join(RESOURCES_ALL)
 
+BLUE = "\033[0;94m"
+RED = "\033[0;91m"
+GREEN = "\033[0;32m"
+RESET = "\033[0m"
+
 
 def get_parser_arguments(parser):
     parser.add_argument(
@@ -101,6 +106,33 @@ def get_parser_arguments(parser):
         help=("Show debugging information"),
         default=False,
     )
+
+
+def pprint(text: str, level: str = "info") -> None:
+    """
+    Print, with formatting
+    """
+    print(pformat(text, level))
+
+
+def pformat(text: str, level: str = "info") -> str:
+    """
+    Format the text with colors.
+
+    Args:
+        text: the text to format
+        info: the mode ("input" or "error")
+
+    Returns a formatted string
+    """
+    if level == "info":
+        return "%s%s%s" % (BLUE, text, RESET)
+    elif level == "error":
+        return "%s%s%s" % (RED, text, RESET)
+    elif level == "good":
+        return "%s%s%s" % (GREEN, text, RESET)
+    else:
+        return "%s%s%s" % (BLUE, text, RESET)
 
 
 def _hex_to_rgb(hex_color):
@@ -236,9 +268,12 @@ def test_mpm(api, workspace: str, model_name: str, nb_events: int, days: int):
     try:
         import comet_mpm
     except ImportError:
-        raise ImportError(
-            "comet_mpm not installed; run `pip install comet-mpm` to install it"
-        ) from None
+        pprint(
+            "comet_mpm not installed; run `pip install comet-mpm` to install it",
+            "error",
+        )
+        pprint("Skipping mpm tests", "error")
+        return
 
     MPM = comet_mpm.CometMPM(
         workspace_name=workspace,
@@ -269,31 +304,31 @@ def test_experiment(
         workspace (str): workspace name
         project_name (str): project_name
     """
-    print("    Attempting to create an experiment...")
+    pprint("    Attempting to create an experiment...", "info")
     experiment = Experiment(workspace=workspace, project_name=project_name)
     key = experiment.get_key()
     experiment.set_name(name)
 
     if "dataset-info" in includes:
         # Dataset info:
-        print("    Attempting to log a dataset...")
+        pprint("    Attempting to log a dataset...", "info")
         experiment.log_dataset_info(
             name="mnist", version="1.6.8", path="/opt/share/datasets/mnist.db"
         )
 
     if "metric" in includes:
-        print("    Attempting to log metrics...")
+        pprint("    Attempting to log metrics...", "info")
         for step in range(100):
             experiment.log_metric("accuracy", random.random() * step, step=step)
             experiment.log_metric("loss", 100 - (random.random() * step), step=step)
 
     if "image" in includes:
-        print("    Attempting to log an image...")
+        pprint("    Attempting to log an image...", "info")
         image = _create_image("smoke-test", background_color="red")
         experiment.log_image(image, "smoke-test-image.png", step=0)
 
     if "asset" in includes:
-        print("    Attempting to log an asset...")
+        pprint("    Attempting to log an asset...", "info")
         data = {
             "key1": 1,
             "key2": {
@@ -304,14 +339,14 @@ def test_experiment(
         experiment.log_asset_data(data, "smoke-test.json")
 
     if "confusion-matrix" in includes:
-        print("    Attempting to log a confusion matrix...")
+        pprint("    Attempting to log a confusion matrix...", "info")
         y_true = [(i % 10) for i in range(500)]
         y_predicted = [random.randint(0, 9) for i in range(500)]
         images = [_create_image(str(n), margin=30, randomness=30) for n in y_true]
         experiment.log_confusion_matrix(y_true, y_predicted, images=images, step=0)
 
     if "embedding" in includes:
-        print("    Attempting to log embedding...")
+        pprint("    Attempting to log embedding...", "info")
         labels = [str(i % 10) for i in range(100)]
         images = [
             _create_image(label, margin=0, randomness=30, width=30) for label in labels
@@ -354,9 +389,9 @@ def test_experiment(
             title="Comet Embedding",
         )
 
-    print("    Attempting to upload experiment...")
+    pprint("    Attempting to upload experiment...", "info")
     experiment.end()
-    print("Done!")
+    pprint("Done!", "good")
     return key
 
 
@@ -391,13 +426,13 @@ def test_optimizer(workspace: str, project_name: str):
         log_env_details=False,
         log_code=False,
     ):
-        print("Trying:", experiment.params)
+        pprint("Trying: %s" % (experiment.params,), "info")
         loss = objective_function(experiment.params["x"])
         experiment.log_metric("loss", loss, step=0)
         count += 1
         experiment.end()
-        print("Optimizer job done! Completed %d experiments." % count)
-    count = 0
+
+    pprint("Optimizer job done! Completed %d experiments." % count, "good")
 
 
 def smoke_test(parsed_args, remaning=None) -> None:
@@ -433,13 +468,13 @@ def smoke_test(parsed_args, remaning=None) -> None:
     if workspace not in api.get_workspaces():
         raise Exception("workspace %r does not exist!" % workspace)
 
-    print("Running cometx smoke tests...")
-    print("Using %s/%s on %s" % (workspace, project_name, comet_base_url))
+    pprint("Running cometx smoke tests...", "info")
+    pprint("Using %s/%s on %s" % (workspace, project_name, comet_base_url), "info")
 
     if "experiment" in includes or any(
         value in includes for value in RESOURCES["experiment"]
     ):
-        print("    Attempting to log experiment...")
+        pprint("    Attempting to log experiment...", "info")
         project_data = api.get_project(workspace, project_name) or {}
         # Test Experiment
         key = test_experiment(
@@ -454,45 +489,61 @@ def smoke_test(parsed_args, remaning=None) -> None:
         if "metric" in includes:
             metric = experiment.get_metrics("loss")
             while len(metric) == 0 or "metricName" not in metric[0]:
-                print("Waiting on metrics to finish processing...")
+                pprint("Waiting on metrics to finish processing...", "info")
                 time.sleep(5)
                 metric = experiment.get_metrics("loss")
 
             if "metricName" in metric[0] and metric[0]["metricValue"]:
-                print("\nSuccessfully validated metric presence\n")
+                pprint("Successfully validated metric presence", "good")
             else:
-                print("\nSomething is wrong\n")
+                pprint("Something is wrong with logging metrics", "error")
+
+        if "image" in includes:
+            images = experiment.get_asset_list("image")
+
+            if len(images) > 0:
+                pprint("Successfully validated image presence", "good")
+            else:
+                pprint("Something is wrong with logging images", "error")
 
     if "panel" in includes:
-        print("    Attempting to upload smoke-test panel...")
-        api.upload_panel_url(
-            workspace,
-            "https://raw.githubusercontent.com/comet-ml/comet-examples/master/panels/SmokeTest.py",
-        )
+        pprint("    Attempting to upload smoke-test panel...", "info")
+        try:
+            api.upload_panel_url(
+                workspace,
+                "https://raw.githubusercontent.com/comet-ml/comet-examples/master/panels/SmokeTest.py",
+            )
+        except Exception:
+            pprint(
+                "    Uploading panels is not supported in this backend. You need at least version 3.35.143",
+                "error",
+            )
 
     if "optimizer" in includes or any(
         value in includes for value in RESOURCES["optimizer"]
     ):
-        print("    Attempting to run optimizer...")
+        pprint("    Attempting to run optimizer...", "info")
         os.environ["COMET_OPTIMIZER_URL"] = comet_base_url + "/optimizer/"
         test_optimizer(
             workspace=workspace,
             project_name=project_name,
         )
-        print(
-            "\nCompleted Optimizer test, you will need to check the Comet UI to ensure all the data has been correctly logged.\n"
+        pprint(
+            "\nCompleted Optimizer test, you will need to check the Comet UI to ensure all the data has been correctly logged.\n",
+            "good",
         )
 
     if "mpm" in includes or any(value in includes for value in RESOURCES["mpm"]):
-        print("    Attempting to run mpm tests...")
+        pprint("    Attempting to run mpm tests...", "info")
         test_mpm(api, workspace, project_name, nb_events=10, days=7)
 
         comet_mpm_ui_url = comet_base_url + f"/{workspace}#model-production-monitoring"
-        print(
-            f"\nCompleted MPM test, you will need to check the MPM UI ({comet_mpm_ui_url}) to validate the data has been logged, this can take up to 5 minutes.\n"
+        pprint(
+            f"\nCompleted MPM test, you will need to check the MPM UI ({comet_mpm_ui_url}) to validate the data has been logged, this can take up to 5 minutes.\n",
+            "good",
         )
 
-    print("All tests have completed")
+    pprint("All tests have completed", "info")
 
 
 def main(args):
