@@ -513,6 +513,10 @@ def smoke_test(parsed_args, remaning=None) -> None:
                 workspace,
                 "https://raw.githubusercontent.com/comet-ml/comet-examples/master/panels/SmokeTest.py",
             )
+            api.upload_panel_url(
+                workspace,
+                "https://raw.githubusercontent.com/comet-ml/comet-examples/master/panels/OptimizerAnalysis.py",
+            )
         except Exception:
             pprint(
                 "    Uploading panels is not supported in this backend. You need at least version 3.35.143",
