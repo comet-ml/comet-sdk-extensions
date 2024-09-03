@@ -53,7 +53,6 @@ Where [FLAGS ...] is zero or more of the following:
 * `--parallel N` - the number of threads to use (default is based on CPUs)
 * `--query` - if given as a Comet query string, only download those
     experiments that match
-* `--skip` - if given, skip previously downloaded experiments
 * `--list` - use to list available workspaces, projects, experiments,
     artifacts, or models
 * `--output` - download resources to folder other than current one
@@ -63,8 +62,8 @@ Where [FLAGS ...] is zero or more of the following:
     RESOURCE names from above, or "experiments" to just get project info)
 * `--asset-type` - asset type to match, or leave off to match all
 * `--filename` - filename to match, or leave off to match all
-* `--overwrite` - overwrite any existing files
-* `--force` - don't ask to download, just do it
+* `--sync` - what level to to sync at: all, experiment, project, workspace
+* `--ask` - ask before download
 * `--help` - this message
 """
 
@@ -143,15 +142,8 @@ def get_parser_arguments(parser):
     )
     parser.add_argument(
         "-f",
-        "--force",
-        help="Do not query the user; answer `yes` for any questions",
-        action="store_true",
-        default=False,
-    )
-    parser.add_argument(
-        "-s",
-        "--skip",
-        help="If given, skip previously downloaded experiments",
+        "--ask",
+        help="Queries the user; if flag not included system will answer `yes` for all queries",
         action="store_true",
         default=False,
     )
@@ -174,10 +166,10 @@ def get_parser_arguments(parser):
         default=None,
     )
     parser.add_argument(
-        "--overwrite",
-        help="Overwrite any existing files",
-        action="store_true",
-        default=False,
+        "--sync",
+        help="What level to sync at: all, experiment, project, or workspace",
+        type=str,
+        default="all",
     )
     parser.add_argument(
         "--debug",
@@ -215,11 +207,10 @@ def download(parsed_args, remaining=None):
                 use_name=parsed_args.use_name,
                 list_items=parsed_args.list,
                 flat=parsed_args.flat,
-                force=parsed_args.force,
+                ask=parsed_args.ask,
                 filename=parsed_args.filename,
                 asset_type=parsed_args.asset_type,
-                overwrite=parsed_args.overwrite,
-                skip=parsed_args.skip,
+                sync=parsed_args.sync,
                 debug=parsed_args.debug,
                 query=parsed_args.query,
                 max_workers=max_workers,
@@ -244,11 +235,10 @@ def download(parsed_args, remaining=None):
             output=parsed_args.output,
             list_items=parsed_args.list,
             flat=parsed_args.flat,
-            force=parsed_args.force,
+            ask=parsed_args.ask,
             filename=parsed_args.filename,
             asset_type=parsed_args.asset_type,
-            overwrite=parsed_args.overwrite,
-            skip=parsed_args.skip,
+            sync=parsed_args.sync,
             debug=parsed_args.debug,
             query=parsed_args.query,
             max_workers=max_workers,

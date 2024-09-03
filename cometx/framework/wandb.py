@@ -22,11 +22,10 @@ from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import unquote
 
 import comet_ml
+import wandb
 from comet_ml.annotations import Box, Layer
 from comet_ml.cli_args_parse import _parse_cmd_args, _parse_cmd_args_naive
 from comet_ml.data_structure import Histogram
-
-import wandb
 
 from ..utils import download_url, remove_extra_slashes
 
@@ -48,11 +47,10 @@ class DownloadManager:
         output=None,
         list_items=False,
         flat=False,
-        force=False,
+        ask=False,
         filename=None,
         asset_type=None,
-        overwrite=False,
-        skip=False,
+        sync="all",
         debug=False,
         query=None,
         max_workers=1,
@@ -62,11 +60,10 @@ class DownloadManager:
         self.root = output if output is not None else os.getcwd()
         self.debug = debug
         self.flat = flat
-        self.skip = skip
-        self.force = force
+        self.ask = ask
         self.filename = filename
         self.asset_type = asset_type
-        self.overwrite = overwrite
+        self.sync = sync
         if max_workers > 1:
             self.queue = ThreadPoolExecutor(max_workers=max_workers)
         else:
@@ -389,12 +386,14 @@ class DownloadManager:
             ):
                 continue
 
-            # Skip if already downloaded, and not force:
+            # Skip if already downloaded, and not sync:
             if (
                 os.path.exists(os.path.join(workspace, project, experiment))
-                and not self.force
+                and self.sync == "experiment"
             ):
-                print(f"skipping {workspace}/{project}/{experiment}...")
+                print(
+                    f"Sync: skipping experiment {workspace}/{project}/{experiment}..."
+                )
                 continue
 
             print(

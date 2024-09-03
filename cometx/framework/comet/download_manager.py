@@ -75,8 +75,7 @@ git checkout {parent}
 """
 
 
-def is_same(name1, name2):
-    # type: (Any, Any) -> bool
+def is_same(name1: Any, name2: Any) -> bool:
     """
     Check two versions/stages/alias to see if
     they match; case insensitive.
@@ -114,8 +113,7 @@ def clean_comet_path(path):
     return path
 
 
-def flatten(list):
-    # type (List[List[str]]) -> List[str]
+def flatten(list: List[List[str]]) -> List[str]:
     """
     Flatten a list of lists into a single list.
     """
@@ -127,8 +125,7 @@ class DownloadManager:
     Class for holding all of the download functions.
     """
 
-    def __init__(self, api_key=None):
-        # type: (Optional[str]) -> None
+    def __init__(self, api_key: Optional[str] = None):
         """
         The DownloadManager constructor. Optionally takes a Comet API key.
         """
@@ -185,10 +182,9 @@ class DownloadManager:
 
     def list(
         self,
-        comet_path=None,
-        use_name=False,
-    ):
-        # type: (Optional[str], Optional[bool]) -> None
+        comet_path: Optional[str] = None,
+        use_name: Optional[bool] = False,
+    ) -> None:
         """
         The method to list resources.
 
@@ -212,11 +208,10 @@ class DownloadManager:
         use_name=False,
         list_items=False,
         flat=False,
-        force=False,
+        ask=False,
         filename=None,
         asset_type=None,
-        overwrite=False,
-        skip=False,
+        sync="all",
         debug=False,
         query=None,
         max_workers=1,
@@ -230,7 +225,6 @@ class DownloadManager:
             query: (str, option) a Comet query string. See:
                 https://www.comet.com/docs/v2/api-and-sdk/python-sdk/reference/API/#apiquery
             include: (list of str, optional) experiment resources to include in download
-            skip: if True, skip experiments if they have been previously downloaded
             ignore: (list of str, optional) experiment resources to ignore
             output: (str, optional) output path to download to; default is current folder
             use_name: (bool, optional) if True, use the experiment name for folder name; else
@@ -239,11 +233,12 @@ class DownloadManager:
                 otherwise, download them
             flat: (bool, optional) if True, do not use folder hierarchy, but just put
                 into output folder. For experiment download only.
-            force: (bool, optional) if True, do not ask user for permission; else
+            ask: (bool, optional) if True, do not ask user for permission; else
                 ask user to download
             asset_type:  (str, optional) if given, only match assets with this type
             filename: (str, optional) if given, only download files ending with this
-            overwrite: (bool, optional) if given, overwrite files
+            sync: the level to check if previously downloaded; can be "all" (default),
+                "experiment", "project", or "workspace"
         """
         if max_workers > 1:
             self.queue = ThreadPoolExecutor(max_workers=max_workers)
@@ -276,11 +271,10 @@ class DownloadManager:
         self.debug = debug
         self.use_name = use_name
         self.flat = flat
-        self.skip = skip
-        self.force = force
+        self.ask = ask
         self.filename = filename
         self.asset_type = asset_type
-        self.overwrite = overwrite
+        self.sync = sync
         self.summary = {key: 0 for key in self.RESOURCE_FUNCTIONS.keys()}
         self.summary["artifacts"] = 0
         self.summary["model-registry"] = 0
@@ -432,8 +426,7 @@ class DownloadManager:
         print("%-17s: %14s" % ("Total", sum(self.summary.values())))
         print("=" * 33)
 
-    def list_models(self, workspace, name=None):
-        # type: (str, Optional[str]) -> None
+    def list_models(self, workspace: str, name: Optional[str] = None) -> None:
         """
         List the models, one per line.
 
@@ -636,8 +629,7 @@ class DownloadManager:
                     )
                 )
 
-    def list_experiment(self, experiment):
-        # type: (str) -> None
+    def list_experiment(self, experiment: APIExperiment) -> None:
         """
         List the experiment's Comet path.
 
@@ -663,7 +655,7 @@ class DownloadManager:
                 )
             )
 
-    def get_experiment_path(self, experiment, *subdirs):
+    def get_experiment_path(self, experiment: APIExperiment, *subdirs) -> str:
         # type: (str, List[str]) -> str
         """
         Given an APIExperiment, return the Comet path.
@@ -694,21 +686,12 @@ class DownloadManager:
                 else:
                     print("    writing matched %r" % filepath)
             return retval
-        elif self.overwrite:
-            if self.debug:
-                print("    over-writing %r" % filepath)
-            return True
-        elif os.path.exists(filepath):
-            if self.debug:
-                print("    skipping %r, overwrite is False" % filepath)
-            return False
         else:
             if self.debug:
                 print("    writing %r" % filepath)
             return True
 
-    def download_graph(self, experiment):
-        # type: (APIExperiment) -> None
+    def download_graph(self, experiment: APIExperiment) -> None:
         """
         Given an APIExperiment, download the included resources.
 
@@ -1307,7 +1290,8 @@ class DownloadManager:
                 hierarchy?
         """
         path = self.get_experiment_path(experiment)
-        if os.path.exists(path) and self.skip:
+        if os.path.exists(path) and self.sync == "experiment":
+            print("Sync: skipping existing experiment path %r..." % path)
             return
 
         functions = []
@@ -1354,6 +1338,11 @@ class DownloadManager:
         else:
             raise Exception("No such project: %s/%s" % (workspace, project_name))
 
+        # If the project exists, anssync at project level, skip it
+        if self.sync == "project" and os.path.exists(path):
+            print("Sync: skipping existing project path %r..." % path)
+            return
+
         filepath = os.path.join(path, "project_metadata.json")
         if self._should_write(filepath) and "project_metadata" in self.include:
             self.summary["project_metadata"] += 1
@@ -1396,6 +1385,12 @@ class DownloadManager:
             top_level: (bool, optional) is this the top of the download
                 hierarchy?
         """
+        # If the workspace exists, and sync at workspace level, skip it
+        path = os.path.join(self.root, workspace)
+        if self.sync == "workspace" and os.path.exists(path):
+            print("Sync: skipping existing workspace path %r..." % path)
+            return
+
         self.verify_workspace(workspace)
         projects = self.api.get_projects(workspace)
         if top_level and len(projects) > 0:
@@ -1404,7 +1399,7 @@ class DownloadManager:
                     "--flat cannot be used with multiple experiment downloads"
                 )
             total = 0
-            if not self.force and "experiments" not in self.ignore:
+            if self.ask and "experiments" not in self.ignore:
                 for project_name in ProgressBar(projects, "Calculating download"):
                     metadata = self.api.get_project(workspace, project_name)
                     total = total + int(metadata["numberOfExperiments"])
@@ -1431,8 +1426,9 @@ class DownloadManager:
         """
         if total < 2:
             return True
-        if self.force:
+        if not self.ask:
             return True
+
         prompt = (
             "Consider {total} experiments (maximum) for downloading? (y/n) ".format(
                 total=total
