@@ -411,20 +411,20 @@ class CopyManager:
 
             # System info:
             message = SystemDetailsMessage(
-                command=system.get("command", None),
-                env=system.get("env", None),
-                hostname=system.get("hostname", None),
-                ip=system.get("ip", None),
-                machine=system.get("machine", None),
-                os_release=system.get("osRelease", None),
-                os_type=system.get("osType", None),
-                os=system.get("os", None),
-                pid=system.get("pid", None),
-                processor=system.get("processor", None),
-                python_exe=system.get("executable", None),
-                python_version_verbose=system.get("pythonVersionVerbose", None),
-                python_version=system.get("pythonVersion", None),
-                user=system.get("user", None),
+                command=system.get("command") or [],
+                env=system.get("env") or {},
+                hostname=system.get("hostname") or "",
+                ip=system.get("ip") or "",
+                machine=system.get("machine") or "",
+                os_release=system.get("osRelease") or "",
+                os_type=system.get("osType") or "",
+                os=system.get("os") or "",
+                pid=system.get("pid", None) or 0,
+                processor=system.get("processor") or "",
+                python_exe=system.get("executable") or "",
+                python_version_verbose=system.get("pythonVersionVerbose") or "",
+                python_version=system.get("pythonVersion") or "",
+                user=system.get("user") or "",
             )
             experiment._enqueue_message(message)
 
@@ -505,10 +505,10 @@ class CopyManager:
                         "experimentKey": experiment.id,
                         "assetId": asset_map[args.get("assetId", args.get("imageId"))],
                     }
-                    embedding[
-                        "tensorPath"
-                    ] = "/api/asset/download?assetId={assetId}&experimentKey={experimentKey}".format(
-                        **new_args
+                    embedding["tensorPath"] = (
+                        "/api/asset/download?assetId={assetId}&experimentKey={experimentKey}".format(
+                            **new_args
+                        )
                     )
                 if embedding.get("metadataPath"):
                     args = get_query_dict(embedding["metadataPath"])
@@ -516,10 +516,10 @@ class CopyManager:
                         "experimentKey": experiment.id,
                         "assetId": asset_map[args.get("assetId", args.get("imageId"))],
                     }
-                    embedding[
-                        "metadataPath"
-                    ] = "/api/asset/download?assetId={assetId}&experimentKey={experimentKey}".format(
-                        **new_args
+                    embedding["metadataPath"] = (
+                        "/api/asset/download?assetId={assetId}&experimentKey={experimentKey}".format(
+                            **new_args
+                        )
                     )
                 if embedding.get("sprite"):
                     if embedding["sprite"].get("imagePath"):
@@ -530,10 +530,10 @@ class CopyManager:
                                 args.get("assetId", args.get("imageId"))
                             ],
                         }
-                        embedding["sprite"][
-                            "imagePath"
-                        ] = "/api/asset/download?assetId={assetId}&experimentKey={experimentKey}".format(
-                            **new_args
+                        embedding["sprite"]["imagePath"] = (
+                            "/api/asset/download?assetId={assetId}&experimentKey={experimentKey}".format(
+                                **new_args
+                            )
                         )
             binary_io = io.BytesIO(json.dumps(em_json).encode())
             result = self._log_asset_filename(
