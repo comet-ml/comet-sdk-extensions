@@ -13,6 +13,7 @@
 
 import tempfile
 from typing import Any, Dict, List
+from urllib.parse import urlparse
 
 import requests
 from comet_ml import API
@@ -126,26 +127,33 @@ class API(API):
         return filename
 
     def upload_panel_url(self, workspace, item):
-        """ """
+        """
+        Upload a panel from a URL.
+        """
         # TODO:
         # https://github.com/comet-ml/comet-examples/blob/master/panels/TensorboardProfileViewer.py
         # turns into:
         # https://raw.githubusercontent.com/comet-ml/comet-examples/master/panels/TensorboardProfileViewer.py
+        # Does work with private repo (raw) with token::
+        # https://raw.githubusercontent.com/comet-ml/snakebite-custom-solutions/main/panels/AverageTwoMetrics.py?token=XXXX
         print("Downloading %r..." % item)
         response = requests.get(item)
-        if item.endswith(".py"):
+        parsed_url = urlparse(item)
+        if parsed_url.path.endswith(".py"):
             code = response.content.decode()
             print("   Creating zipped code...")
-            filename = create_panel_zip(item, code)
+            filename = create_panel_zip(parsed_url.path, code)
             print("   Uploading panel...")
             self.upload_panel_zip(workspace, filename)
-        elif item.endswith(".zip"):
+        elif parsed_url.path.endswith(".zip"):
             zipcontents = response.content
             print("    Saving zip file...")
             with tempfile.NamedTemporaryFile(suffix=".zip") as fp:
                 fp.write(zipcontents)
                 print("    Uploading panel...")
                 self.upload_panel_zip(workspace, fp.name)
+        else:
+            raise Exception("I don't know what to do with %r" % parsed_url.path)
 
     def upload_panel_code(self, workspace: str, panel_name: str, code: str) -> None:
         """
