@@ -105,8 +105,8 @@ class OfflineExperiment(OfflineExperiment):
             experiment_key=self.id,
             workspace=self.workspace,
             project_name=self.project_name,
-            start_time=self.START_TIME,
-            stop_time=self.STOP_TIME,
+            start_time=self.START_TIME or self.start_time,
+            stop_time=self.STOP_TIME or self.stop_time,
             tags=self.get_tags(),
             resume_strategy=self.resume_strategy,
             customer_error_reported=self.customer_error_reported,
@@ -882,7 +882,7 @@ class CopyManager:
 
         if "git" not in self.ignore:
             self.log_git_metadata(
-                experiment, os.path.join(experiment_folder, "run", "git_metdata.json")
+                experiment, os.path.join(experiment_folder, "run", "git_metadata.json")
             )
             self.log_git_patch(
                 experiment, os.path.join(experiment_folder, "run", "git_diff.patch")
