@@ -22,6 +22,7 @@ Examples:
     cometx delete-assets
     cometx config
     cometx smoke-test
+    cometx update
 
 For more information:
     cometx COMMAND --help
@@ -41,6 +42,7 @@ from . import (
     log,
     reproduce,
     smoke_test,
+    update,
 )
 
 
@@ -82,6 +84,7 @@ def main(raw_args=sys.argv[1:]):
     # Register CLI commands:
     add_subparser(subparsers, download, "download")
     add_subparser(subparsers, copy, "copy")
+    add_subparser(subparsers, update, "update")
     add_subparser(subparsers, log, "log")
     add_subparser(subparsers, delete_assets, "delete-assets")
     add_subparser(subparsers, list_command, "list")
