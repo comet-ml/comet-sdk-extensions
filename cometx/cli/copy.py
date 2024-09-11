@@ -82,12 +82,38 @@ from comet_ml.messages import (
     StandardOutputMessage,
     SystemDetailsMessage,
 )
+from comet_ml.offline_utils import write_experiment_meta_file
 
 from ..api import API
 from ..utils import remove_extra_slashes
 from .copy_utils import upload_single_offline_experiment
 
 ADDITIONAL_ARGS = False
+
+
+class OfflineExperiment(OfflineExperiment):
+    """
+    Wrapper to alter start/stop times
+    """
+
+    START_TIME = None
+    STOP_TIME = None
+
+    def _write_experiment_meta_file(self):
+        write_experiment_meta_file(
+            tempdir=self.tmpdir,
+            experiment_key=self.id,
+            workspace=self.workspace,
+            project_name=self.project_name,
+            start_time=self.START_TIME,
+            stop_time=self.STOP_TIME,
+            tags=self.get_tags(),
+            resume_strategy=self.resume_strategy,
+            customer_error_reported=self.customer_error_reported,
+            customer_error_message=self.customer_error_message,
+            user_provided_experiment_key=self.user_provided_experiment_key,
+            comet_start_sourced=self.comet_start_sourced,
+        )
 
 
 def get_parser_arguments(parser):
@@ -402,6 +428,9 @@ class CopyManager:
             if metadata.get("fileName", None):
                 experiment.set_filename(metadata["fileName"])
 
+            OfflineExperiment.START_TIME = metadata.get("startTimeMillis")
+            OfflineExperiment.STOP_TIME = metadata.get("endTimeMillis")
+
     def log_system_details(self, experiment, filename):
         if not self.quiet:
             with experiment.context_manager("ignore"):
@@ -505,10 +534,10 @@ class CopyManager:
                         "experimentKey": experiment.id,
                         "assetId": asset_map[args.get("assetId", args.get("imageId"))],
                     }
-                    embedding["tensorPath"] = (
-                        "/api/asset/download?assetId={assetId}&experimentKey={experimentKey}".format(
-                            **new_args
-                        )
+                    embedding[
+                        "tensorPath"
+                    ] = "/api/asset/download?assetId={assetId}&experimentKey={experimentKey}".format(
+                        **new_args
                     )
                 if embedding.get("metadataPath"):
                     args = get_query_dict(embedding["metadataPath"])
@@ -516,10 +545,10 @@ class CopyManager:
                         "experimentKey": experiment.id,
                         "assetId": asset_map[args.get("assetId", args.get("imageId"))],
                     }
-                    embedding["metadataPath"] = (
-                        "/api/asset/download?assetId={assetId}&experimentKey={experimentKey}".format(
-                            **new_args
-                        )
+                    embedding[
+                        "metadataPath"
+                    ] = "/api/asset/download?assetId={assetId}&experimentKey={experimentKey}".format(
+                        **new_args
                     )
                 if embedding.get("sprite"):
                     if embedding["sprite"].get("imagePath"):
@@ -530,10 +559,10 @@ class CopyManager:
                                 args.get("assetId", args.get("imageId"))
                             ],
                         }
-                        embedding["sprite"]["imagePath"] = (
-                            "/api/asset/download?assetId={assetId}&experimentKey={experimentKey}".format(
-                                **new_args
-                            )
+                        embedding["sprite"][
+                            "imagePath"
+                        ] = "/api/asset/download?assetId={assetId}&experimentKey={experimentKey}".format(
+                            **new_args
                         )
             binary_io = io.BytesIO(json.dumps(em_json).encode())
             result = self._log_asset_filename(
