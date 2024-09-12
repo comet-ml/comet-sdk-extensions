@@ -111,6 +111,15 @@ def update_experiments(source, destination):
         with open(os.path.join(experiment_folder, "metadata.json")) as fp:
             metadata = json.load(fp)
         # Next, look it up in destination:
+        print(
+            "    Attempting to get %s/%s/%s - name: %s"
+            % (
+                api.server_url,
+                workspace_src,
+                project_src,
+                metadata.get("experimentName"),
+            )
+        )
         experiment = api.get_experiment(
             workspace_dst, project_dst or project_src, metadata.get("experimentName")
         )
@@ -127,6 +136,11 @@ def update_experiments(source, destination):
                 with open(git_metadata_path) as fp:
                     git_metadata = json.load(fp)
                 experiment.set_git_metadata(**git_metadata)
+                print("    done!")
+            else:
+                print("    no metadata found; skipping")
+        else:
+            print("    no experiment found; skipping")
 
 
 def update(parsed_args, remaining=None):
