@@ -126,9 +126,14 @@ def update_experiments(source, destination):
         # Finally, update data:
         if experiment:
             print("    Updating to %r..." % experiment.url)
-            experiment._api._client.set_experiment_start_end(
-                experiment.id, metadata["startTimeMillis"], metadata["endTimeMillis"]
-            )
+            if metadata.get("startTimeMillis") or metadata.get("endTimeMillis"):
+                experiment._api._client.set_experiment_start_end(
+                    experiment.id,
+                    metadata["startTimeMillis"],
+                    metadata["endTimeMillis"],
+                )
+            else:
+                print("    Now times found; not updating start/stop times")
             git_metadata_path = os.path.join(
                 experiment_folder, "run", "git_metadata.json"
             )
@@ -138,7 +143,7 @@ def update_experiments(source, destination):
                 experiment.set_git_metadata(**git_metadata)
                 print("    done!")
             else:
-                print("    no metadata found; skipping")
+                print("    no metadata found; not updating git metadata")
         else:
             print("    no experiment found; skipping")
 
