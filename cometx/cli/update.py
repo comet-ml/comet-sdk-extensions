@@ -107,6 +107,7 @@ def update_experiments(source, destination):
             continue
 
         print("Updating from %r..." % experiment_folder)
+        act_workspace, act_project, _ = experiment_folder.split("/")
         # First, get experiment name:
         with open(os.path.join(experiment_folder, "metadata.json")) as fp:
             metadata = json.load(fp)
@@ -115,13 +116,13 @@ def update_experiments(source, destination):
             "    Attempting to get %s/%s/%s - name: %s"
             % (
                 api.server_url,
-                workspace_src,
-                project_src,
+                workspace_dst,
+                project_dst or act_project,
                 metadata.get("experimentName"),
             )
         )
         experiment = api.get_experiment(
-            workspace_dst, project_dst or project_src, metadata.get("experimentName")
+            workspace_dst, project_dst or act_project, metadata.get("experimentName")
         )
         # Finally, update data:
         if experiment:
