@@ -34,13 +34,15 @@ from the source, and then copy it to the destination Comet instance.
 
 ### Downloading Data
 
-The first step in a migration is to use `comet download`. For example:
+The first step in a migration is to use `comet download`. 
+For example, to download from an existing Comet installation:
 
 ```shell
 COMET_URL_OVERRIDE=http://comet.a.com/clientlib \
 COMET_API_KEY=A-KEY \
 cometx download <WORKSPACE>/<PROJECT>
 ```
+See below for migrating from another vendor.
 
 The `cometx download` subcommand downloads all of the Comet experiment
 data into local files. Note that `<WORKSPACE>/<PROJECT>` refers to a
@@ -113,12 +115,13 @@ cometx download --from wandb stacey/yolo-drive/1dwb18ia
 
 This will download the WandB run: https://wandb.ai/stacey/yolo-drive/runs/1dwb18ia
 
+After download, the following `copy` commands will be relevant. 
+
 #### Additional Download Flags
 
 These flags may be useful:
 
-* `--ovewrite` - overwrite any existing files
-* `--force` - don't ask to download, just do it
+* `--sync SYNC` - if additional data has been logged at wandb since last download. This is the level to sync at: all, experiment, project, or workspace
 
 ### Copying Data
 
