@@ -104,8 +104,8 @@ flag. Currently, `cometx` supports:
 
 * `--from wandb`
 
-Note that you need to be logged into wandb before downloading your
-data.
+**Note that you need to be logged into wandb before downloading your
+data.**
 
 For example:
 
