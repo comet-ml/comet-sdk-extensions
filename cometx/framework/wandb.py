@@ -459,7 +459,7 @@ class DownloadManager:
                             run, json.dumps(summary), "wandb_summary.json"
                         )
                 elif name == "wandb-metadata.json":
-                    # System info etc
+                    # System info etc; only available to the owner?!
                     self.download_system_details(run, file, workspace, project)
                 elif name == "diff.patch" and "git" not in self.ignore:
                     self.download_git_patch(run, file)
