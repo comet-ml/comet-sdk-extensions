@@ -151,6 +151,12 @@ def get_parser_arguments(parser):
         default=False,
         action="store_true",
     )
+    parser.add_argument(
+        "--sync",
+        help="Check to see if experiment name has been created first; if so, skip",
+        default=False,
+        action="store_true",
+    )
 
 
 def copy(parsed_args, remaining=None):
@@ -164,6 +170,7 @@ def copy(parsed_args, remaining=None):
             parsed_args.ignore,
             parsed_args.debug,
             parsed_args.quiet,
+            parsed_args.sync,
         )
         if parsed_args.debug:
             print("finishing...")
@@ -201,11 +208,12 @@ class CopyManager:
         """
         self.api = API()
 
-    def copy(self, source, destination, symlink, ignore, debug, quiet):
+    def copy(self, source, destination, symlink, ignore, debug, quiet, sync):
         """ """
         self.ignore = ignore
         self.debug = debug
         self.quiet = quiet
+        self.sync = sync
         self.copied_reports = False
         comet_destination = remove_extra_slashes(destination)
         comet_destination = comet_destination.split("/")
@@ -360,6 +368,7 @@ class CopyManager:
 
     def copy_experiment_to(self, experiment_folder, workspace_dst, project_dst):
         title = experiment_folder
+        experiment_name = None
         # See if there is a name:
         filename = os.path.join(experiment_folder, "others.jsonl")
         if os.path.isfile(filename):
@@ -368,6 +377,7 @@ class CopyManager:
                 while line:
                     others_json = json.loads(line)
                     if others_json["name"] == "Name":
+                        experiment_name = others_json["valueCurrent"]
                         title = (
                             f"{experiment_folder} (\"{others_json['valueCurrent']}\")"
                         )
@@ -395,6 +405,19 @@ class CopyManager:
             if experiment:
                 experiment.end()
             self.copied_reports = True
+
+        if self.sync:
+            if experiment_name is not None:
+                experiment = self.api.get_experiment(
+                    workspace_dst, project_dst, experiment_name
+                )
+                if experiment is not None:
+                    print("    Experiment exists; skipping due to --sync")
+                    return
+                else:
+                    print("   Experiment doesn't exist on destination; copying...")
+            else:
+                print("    Can't sync because source has no name; copying...")
 
         experiment = self.create_experiment(workspace_dst, project_dst)
         # copy experiment_folder stuff to experiment
