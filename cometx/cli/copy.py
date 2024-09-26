@@ -534,10 +534,10 @@ class CopyManager:
                         "experimentKey": experiment.id,
                         "assetId": asset_map[args.get("assetId", args.get("imageId"))],
                     }
-                    embedding[
-                        "tensorPath"
-                    ] = "/api/asset/download?assetId={assetId}&experimentKey={experimentKey}".format(
-                        **new_args
+                    embedding["tensorPath"] = (
+                        "/api/asset/download?assetId={assetId}&experimentKey={experimentKey}".format(
+                            **new_args
+                        )
                     )
                 if embedding.get("metadataPath"):
                     args = get_query_dict(embedding["metadataPath"])
@@ -545,10 +545,10 @@ class CopyManager:
                         "experimentKey": experiment.id,
                         "assetId": asset_map[args.get("assetId", args.get("imageId"))],
                     }
-                    embedding[
-                        "metadataPath"
-                    ] = "/api/asset/download?assetId={assetId}&experimentKey={experimentKey}".format(
-                        **new_args
+                    embedding["metadataPath"] = (
+                        "/api/asset/download?assetId={assetId}&experimentKey={experimentKey}".format(
+                            **new_args
+                        )
                     )
                 if embedding.get("sprite"):
                     if embedding["sprite"].get("imagePath"):
@@ -559,10 +559,10 @@ class CopyManager:
                                 args.get("assetId", args.get("imageId"))
                             ],
                         }
-                        embedding["sprite"][
-                            "imagePath"
-                        ] = "/api/asset/download?assetId={assetId}&experimentKey={experimentKey}".format(
-                            **new_args
+                        embedding["sprite"]["imagePath"] = (
+                            "/api/asset/download?assetId={assetId}&experimentKey={experimentKey}".format(
+                                **new_args
+                            )
                         )
             binary_io = io.BytesIO(json.dumps(em_json).encode())
             result = self._log_asset_filename(
@@ -722,6 +722,12 @@ class CopyManager:
                     ),
                 )
 
+    def _prepare_parameter_value(self, value):
+        if isinstance(value, list):
+            return str(value)
+        else:
+            return value
+
     def log_parameters(self, experiment, filename):
         """ """
         if not self.quiet:
@@ -730,7 +736,10 @@ class CopyManager:
         if os.path.exists(filename):
             parameters = json.load(open(filename))
             parameter_dictionary = {
-                parameter["name"]: parameter["valueCurrent"] for parameter in parameters
+                parameter["name"]: self._prepare_parameter_value(
+                    parameter["valueCurrent"]
+                )
+                for parameter in parameters
             }
             experiment.log_parameters(parameter_dictionary, nested_support=True)
 
