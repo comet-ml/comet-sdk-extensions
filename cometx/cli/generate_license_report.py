@@ -40,15 +40,17 @@ def generate_license_report(parsed_args, remaining=None):
 
         url = api.config["comet.url_override"]
         result = urlparse(url)
-        netloc = result.netloc.split(".")[0] + "-admin"
+        parts = result.netloc.split(".", 1)
+        netloc = parts[0] + "-admin." + ".".join(parts[1:])
         admin_url = "%s://%s/api/admin/generate-license-report" % (
             result.scheme,
             netloc,
         )
+        print("Attempting to generate license report from %s..." % admin_url)
         response = api._client.get(
             admin_url, headers={"Authorization": api.api_key}, params={}
         )
-        breakpoint()
+        print(response.json())
 
     except KeyboardInterrupt:
         if parsed_args.debug:
