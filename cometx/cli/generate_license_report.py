@@ -20,6 +20,7 @@ cometx generate-license-report
 
 import argparse
 import sys
+from urllib.parse import urlparse
 
 ADDITIONAL_ARGS = False
 
@@ -31,13 +32,24 @@ def get_parser_arguments(parser):
 
 
 def generate_license_report(parsed_args, remaining=None):
-    # from comet_ml import API
-
-    # api = API()
-
     # Called via `cometx generate-license-report ...`
+    from comet_ml import API
+
     try:
-        2 + 3
+        api = API()
+
+        url = api.config["comet.url_override"]
+        result = urlparse(url)
+        netloc = result.netloc.split(".")[0] + "-admin"
+        admin_url = "%s://%s/api/admin/generate-license-report" % (
+            result.scheme,
+            netloc,
+        )
+        response = api._client.get(
+            admin_url, headers={"Authorization": api.api_key}, params={}
+        )
+        breakpoint()
+
     except KeyboardInterrupt:
         if parsed_args.debug:
             raise
