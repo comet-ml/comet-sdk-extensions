@@ -23,6 +23,7 @@ Examples:
     cometx config
     cometx smoke-test
     cometx update
+    cometx generate-license-report
 
 For more information:
     cometx COMMAND --help
@@ -38,6 +39,7 @@ from . import (
     copy,
     delete_assets,
     download,
+    generate_license_report,
     list_command,
     log,
     reproduce,
@@ -85,6 +87,7 @@ def main(raw_args=sys.argv[1:]):
     add_subparser(subparsers, download, "download")
     add_subparser(subparsers, copy, "copy")
     add_subparser(subparsers, update, "update")
+    add_subparser(subparsers, generate_license_report, "generate-license-report")
     add_subparser(subparsers, log, "log")
     add_subparser(subparsers, delete_assets, "delete-assets")
     add_subparser(subparsers, list_command, "list")
