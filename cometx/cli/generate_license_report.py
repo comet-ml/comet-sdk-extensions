@@ -40,11 +40,9 @@ def generate_license_report(parsed_args, remaining=None):
 
         url = api.config["comet.url_override"]
         result = urlparse(url)
-        parts = result.netloc.split(".", 1)
-        netloc = parts[0] + "-admin." + ".".join(parts[1:])
-        admin_url = "%s://%s/api/admin/generate-license-report" % (
+        admin_url = "%s://%s/api/admin/chargeback/report" % (
             result.scheme,
-            netloc,
+            result.netloc,
         )
         print("Attempting to generate license report from %s..." % admin_url)
         response = api._client.get(
