@@ -34,6 +34,7 @@ Where TYPE is one of the following names:
 * metrics
 * notebook
 * panel
+* tensorflow-file
 * text-sample
 * video
 * other
@@ -43,6 +44,8 @@ import glob
 import json
 import os
 import sys
+
+from comet_ml import ExistingExperiment
 
 from ..api import API
 from ..panel_utils import create_panel_zip
@@ -218,6 +221,16 @@ def log_cli(parsed_args):
         for experiment in experiments:
             for filename in parsed_args.FILENAME:
                 log_experiment_parameters_from_file(experiment, filename)
+
+    elif parsed_args.type == "tensorflow-file":
+        if not parsed_args.FILENAME:
+            raise Exception("Logging `tensorflow-file` requires folder")
+
+        for experiment in experiments:
+            ee = ExistingExperiment(previous_experiment=experiment.id)
+            for filename in parsed_args.FILENAME:
+                ee.log_tensorflow_folder(filename)
+            ee.end()
 
     else:
         if not parsed_args.FILENAME:
