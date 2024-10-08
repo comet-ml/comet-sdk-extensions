@@ -38,6 +38,7 @@ Where TYPE is one of the following names:
 * text-sample
 * video
 * other
+* tensorboard-folder-assets
 """
 import argparse
 import glob
@@ -54,6 +55,7 @@ from .utils import (
     log_points_3d_off_file,
     log_points_3d_pcd_file,
     log_points_3d_xyz_file,
+    log_tensorboard_folder_assets,
 )
 
 ADDITIONAL_ARGS = False
@@ -221,6 +223,11 @@ def log_cli(parsed_args):
         for experiment in experiments:
             for filename in parsed_args.FILENAME:
                 log_experiment_parameters_from_file(experiment, filename)
+
+    elif parsed_args.type == "tensorboard-folder-assets":
+        for experiment in experiments:
+            for filename in parsed_args.FILENAME:
+                log_tensorboard_folder_assets(experiment, filename)
 
     elif parsed_args.type == "tensorflow-file":
         if not parsed_args.FILENAME:

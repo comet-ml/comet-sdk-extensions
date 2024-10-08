@@ -13,6 +13,7 @@
 # ****************************************
 
 import os
+import random
 
 from comet_ml import ExistingExperiment
 
@@ -190,3 +191,53 @@ def log_points_3d_off_file(experiment, filename):
             line = fp.readline()
 
     log_points(filename, experiment, points, boxes)
+
+
+def log_tensorboard_folder_assets(experiment, full_path):
+    from tensorboard.backend.event_processing import event_accumulator
+
+    for run_dir in os.listdir(full_path):
+        # example run dir: run_dir = './tensorboard_example/tensorboard/toy.fit.experiment1.10.0.20240930.135419.21510_0'
+        folder = os.path.join(full_path, run_dir)
+        if not os.path.isdir(folder):
+            continue
+        print(f"Starting upload for {run_dir}...")
+        experiment.log_other("tensorboard-log", run_dir)
+        for subdir in os.listdir(folder):
+            newdir = os.path.join(full_path, run_dir, subdir)
+            if not os.path.isdir(newdir):
+                continue
+            # Load the log file
+            ea = event_accumulator.EventAccumulator(newdir)
+            ea.Reload()  # Load the log data
+
+            # Print available tags (e.g., scalar names, histogram names, etc.) - example sent only has scalar data
+            tags = ea.Tags()
+            print("Tags: %s" % tags)
+
+            # Extract scalar metric data (e.g., 'loss' metric)
+            if "scalars" in tags:
+                if tags["scalars"]:
+                    for metric_name in tags["scalars"]:
+                        scalar_data = ea.Scalars(metric_name)
+                        # Extract step, value, and wall_time for each scalar event
+                        data = []
+                        for event in scalar_data:
+                            step = event.step
+                            value = event.value
+                            wall_time = event.wall_time
+                            data.append(
+                                {"value": value, "step": step, "wall_time": wall_time}
+                            )
+                        if len(data) > 15_000:
+                            data = random.sample(data, 15_000)
+                        for row in data:
+                            experiment.log_metric(
+                                f"{subdir}/{metric_name}",
+                                row["value"],
+                                step=row["step"],
+                                timestamp=row["wall_time"],
+                            )
+                else:
+                    print("No scalar data for this experiment")
+        print(f"Upload complete for {run_dir}")
