@@ -156,16 +156,16 @@ def log_cli(parsed_args):
 
     api = API()
 
-    if experiment_key:
+    if parsed_args.type in ["panel", "tensorboard-folder-assets"]:
+        experiments = []
+    elif experiment_key:
         experiments = [api.get_experiment(workspace, project_name, experiment_key)]
     elif parsed_args.query is not None:
         experiments = get_query_experiments(
             api, parsed_args.query, workspace, project_name
         )
-    elif parsed_args.type != "panel":
-        experiments = api.get_experiments(workspace, project_name)
     else:
-        experiments = []
+        experiments = api.get_experiments(workspace, project_name)
 
     if parsed_args.type == "panel":
         for item in parsed_args.FILENAME:
@@ -225,9 +225,9 @@ def log_cli(parsed_args):
                 log_experiment_parameters_from_file(experiment, filename)
 
     elif parsed_args.type == "tensorboard-folder-assets":
-        for experiment in experiments:
-            for filename in parsed_args.FILENAME:
-                log_tensorboard_folder_assets(experiment, filename)
+        # Special case for now: creates experiments:
+        for filename in parsed_args.FILENAME:
+            log_tensorboard_folder_assets(workspace, project_name, filename)
 
     elif parsed_args.type == "tensorflow-file":
         if not parsed_args.FILENAME:

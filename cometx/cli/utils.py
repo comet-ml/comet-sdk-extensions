@@ -16,6 +16,7 @@ import os
 import random
 
 from comet_ml import ExistingExperiment
+from comet_ml.api import APIExperiment
 
 
 def adjust_point(xyz):
@@ -193,27 +194,33 @@ def log_points_3d_off_file(experiment, filename):
     log_points(filename, experiment, points, boxes)
 
 
-def log_tensorboard_folder_assets(experiment, full_path):
+def log_tensorboard_folder_assets(workspace, project_name, full_path):
     from tensorboard.backend.event_processing import event_accumulator
 
     for run_dir in os.listdir(full_path):
-        # example run dir: run_dir = './tensorboard_example/tensorboard/toy.fit.experiment1.10.0.20240930.135419.21510_0'
-        folder = os.path.join(full_path, run_dir)
-        if not os.path.isdir(folder):
-            continue
+        # here run_dir is toy.fit.experiment1.10.0.20240930.135419.21510_0
+        experiment = APIExperiment(
+            workspace=workspace,
+            project_name=project_name,
+        )
+        print("Created new experiment: %s (%s)" % (experiment.url, run_dir))
+        experiment.set_name(run_dir)
+
         print(f"Starting upload for {run_dir}...")
         experiment.log_other("tensorboard-log", run_dir)
-        for subdir in os.listdir(folder):
+        for subdir in os.listdir(os.path.join(full_path, run_dir)):
             newdir = os.path.join(full_path, run_dir, subdir)
             if not os.path.isdir(newdir):
                 continue
+
             # Load the log file
             ea = event_accumulator.EventAccumulator(newdir)
             ea.Reload()  # Load the log data
 
-            # Print available tags (e.g., scalar names, histogram names, etc.) - example sent only has scalar data
+            # Print available tags (e.g., scalar names, histogram names, etc.) -
+            # example sent only has scalar data
             tags = ea.Tags()
-            print("Tags: %s" % tags)
+            # print("Tags: %s" % tags)
 
             # Extract scalar metric data (e.g., 'loss' metric)
             if "scalars" in tags:
