@@ -237,7 +237,10 @@ def log_tensorboard_folder_assets(workspace, project_name, full_path):
                                 {"value": value, "step": step, "wall_time": wall_time}
                             )
                         if len(data) > 15_000:
-                            data = random.sample(data, 15_000)
+                            data = sorted(
+                                random.sample(data, 15_000),
+                                key=lambda item: item["step"],
+                            )
                         for row in data:
                             experiment.log_metric(
                                 f"{subdir}/{metric_name}",
