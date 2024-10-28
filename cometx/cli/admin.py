@@ -80,7 +80,10 @@ def admin(parsed_args, remaining=None):
 
             print(response.json())
         else:
-            print("Unknown action %r" % parsed_args.ACTION)
+            print(
+                "Unknown action %r; should be one of these: 'chargeback-report'"
+                % parsed_args.ACTION
+            )
 
     except KeyboardInterrupt:
         if parsed_args.debug:
