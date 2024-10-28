@@ -28,7 +28,7 @@ ADDITIONAL_ARGS = False
 def get_parser_arguments(parser):
     parser.add_argument(
         "ACTION",
-        help="The admin action to perform",
+        help="The admin action to perform (chargeback-report)",
         type=str,
     )
     parser.add_argument(
