@@ -30,7 +30,7 @@ except ImportError:
     from cometx.utils import ProgressBar
 
 from comet_ml.api import APIExperiment
-from comet_ml.artifacts import _get_artifact
+from comet_ml.artifact_helpers.artifact_getter import get_artifact
 from comet_ml.config import get_config
 from comet_ml.summary import Summary
 
@@ -823,7 +823,7 @@ class DownloadManager:
             "artifact_id": artifact_details["artifactId"],
             "version_or_alias": version,
         }
-        artifact = _get_artifact(
+        artifact = get_artifact(
             self.api._client, params, None, Summary("DownloadManager"), self.config
         )
         result = artifact.download(path, "OVERWRITE")
