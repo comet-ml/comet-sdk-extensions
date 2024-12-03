@@ -19,6 +19,7 @@ cometx admin chargeback-report
 """
 
 import argparse
+import json
 import sys
 from urllib.parse import urlparse
 
@@ -77,8 +78,11 @@ def admin(parsed_args, remaining=None):
                 headers={"Authorization": api.api_key},
                 params={},
             )
-
-            print(response.json())
+            print("Attempting to save chargeback report...")
+            filename = "comet-chargeback-report-%s.json" % parsed_args.YEAR_MONTH
+            with open(filename, "w") as fp:
+                fp.write(json.dumps(response.json()))
+            print("Chargeback report is saved in %r" % filename)
         else:
             print(
                 "Unknown action %r; should be one of these: 'chargeback-report'"
