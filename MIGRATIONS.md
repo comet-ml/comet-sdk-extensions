@@ -34,7 +34,7 @@ from the source, and then copy it to the destination Comet instance.
 
 ### Downloading Data
 
-The first step in a migration is to use `comet download`. 
+The first step in a migration is to use `cometx download`. 
 For example, to download from an existing Comet installation:
 
 ```shell
