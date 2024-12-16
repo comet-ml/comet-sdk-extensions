@@ -134,10 +134,10 @@ class DownloadManager:
             ):
                 step = None
                 log_as_filename = None
-                parts = filename.rsplit("_", 3)
+                base_filename, ext = os.path.splitext(filename)
+                parts = base_filename.rsplit("_", 2)
                 if len(parts) == 3 and parts[1].isdigit() and parts[0] != "boxes":
                     log_as_filename, step, _ = parts
-                    _, ext = os.path.splitext(filename)
                     log_as_filename += ext
                     step = int(step)
                 self.asset_metadata.append(
@@ -154,7 +154,8 @@ class DownloadManager:
         return "/".join(wandb_file.name.split("/")[:-1])
 
     def get_file_name(self, wandb_file):
-        return wandb_file.name.split("/")[-1]
+        file_name = wandb_file.name.split("/")[-1]
+        return file_name
 
     def download_cmd_parameters(self, run, args):
         print("    downloading parameters...")
