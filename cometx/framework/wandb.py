@@ -74,8 +74,13 @@ class DownloadManager:
     def download_file_task(self, path, file, doit=False):
         def task():
             with tempfile.TemporaryDirectory() as tmpdir:
-                file.download(root=tmpdir)
-                shutil.copy(os.path.join(tmpdir, file.name), path)
+                try:
+                    file.download(root=tmpdir)
+                    shutil.copy(os.path.join(tmpdir, file.name), path)
+                except Exception:
+                    print(
+                        "Unable to download %r to %r; skipping..." % (file.name, path)
+                    )
 
         if self.queue is None or doit:
             # Do it now:
@@ -425,13 +430,17 @@ class DownloadManager:
                     self.download_model_graph(run, file)
                 elif path == "media/images" and "image" not in self.ignore:
                     # FIXME: bounding boxes, (bb and bit masks are saved in assets)
-                    self.download_image(run, file)
+                    if "asset" not in self.ignore:
+                        self.download_image(run, file)
                 elif path == "media/audio" and "audio" not in self.ignore:
-                    self.download_audio(run, file)
+                    if "asset" not in self.ignore:
+                        self.download_audio(run, file)
                 elif path == "media/videos" and "video" not in self.ignore:
-                    self.download_video(run, file)
+                    if "asset" not in self.ignore:
+                        self.download_video(run, file)
                 elif path == "media/text" and "text" not in self.ignore:
-                    self.download_text(run, file)
+                    if "asset" not in self.ignore:
+                        self.download_text(run, file)
                 elif path == "media/html" and "html" not in self.ignore:
                     self.download_html(run, file)
                 elif path.startswith("code") and "code" not in self.ignore:
@@ -657,6 +666,7 @@ class DownloadManager:
         return False
 
     def download_histograms(self, run, name):
+        print("Downloading histograms %r..." % name)
         histograms = run.history(
             keys=[name, "_timestamp"],
             pandas=False,
@@ -674,6 +684,7 @@ class DownloadManager:
                     {"step": step, "histogram": histogram.to_json()}
                 )
         # FIXME: clean name for filename
+        name = name.replace("/", "-")
         path = self.get_path(
             run, "assets", "histogram_combined_3d", filename="%s_history.json" % name
         )
@@ -683,16 +694,11 @@ class DownloadManager:
     def download_metric_task(self, metric, run, count):
         def task():
             print("        downloading metric %r..." % metric)
-            metric_data = run.history(
-                keys=[metric, "_timestamp"],
-                pandas=False,
-                samples=MAX_METRIC_SAMPLES,
-            )
             filename = self.get_path(
                 run, "metrics", filename="metric_%05d.jsonl" % count
             )
             with open(filename, "w") as fp:
-                for row in metric_data:
+                for row in run.scan_history(keys=[metric, "_step", "_timestamp"]):
                     step = row.get("_step", None)
                     timestamp = row.get("_timestamp", None)
                     value = row.get(metric, None)
@@ -720,105 +726,114 @@ class DownloadManager:
             self.queue.submit(task)
 
     def download_metrics(self, run):
-        print("    downloading metrics...")
-        history = run.history(pandas=False, samples=1)
-        if not history:
-            metrics = []
-        else:
-            samples = history[0]
-            metrics = list(samples.keys())
-
         metrics_summary_path = self.get_path(run, filename="metrics_summary.jsonl")
 
         count = 0
         with open(metrics_summary_path, "w") as fp:
-            system_metrics = run.history(stream="events", pandas=False)
-            system_metric_names = set()
-            for line in system_metrics:
-                for key in line.keys():
-                    if key.startswith("_"):
-                        continue
-                    system_metric_names.add(key)
+            if "system-metrics" not in self.ignore:
+                system_metrics = run.history(stream="events", pandas=False)
+                system_metric_names = set()
+                for line in system_metrics:
+                    for key in line.keys():
+                        if key.startswith("_"):
+                            continue
+                        system_metric_names.add(key)
 
-            for system_metric_name in system_metric_names:
-                fp.write(
-                    json.dumps({"metric": system_metric_name, "count": count}) + "\n"
-                )
-                filename = self.get_path(
-                    run, "metrics", filename="metric_%05d.jsonl" % count
-                )
-                with open(filename, "w") as metric_fp:
-                    name = (
-                        system_metric_name.replace("system.", "system/")
-                        if system_metric_name.startswith("system.")
-                        else system_metric_name
+                for system_metric_name in system_metric_names:
+                    fp.write(
+                        json.dumps({"metric": system_metric_name, "count": count})
+                        + "\n"
                     )
-                    name = name.replace("\\.", "")
-                    print("        downloading summary metric %r..." % name)
-                    for step, line in enumerate(system_metrics):
-                        timestamp = line["_timestamp"]
+                    filename = self.get_path(
+                        run, "metrics", filename="metric_%05d.jsonl" % count
+                    )
+                    with open(filename, "w") as metric_fp:
+                        name = (
+                            system_metric_name.replace("system.", "system/")
+                            if system_metric_name.startswith("system.")
+                            else system_metric_name
+                        )
+                        name = name.replace("\\.", "")
+                        print("        downloading summary metric %r..." % name)
+                        for step, line in enumerate(system_metrics):
+                            timestamp = line["_timestamp"]
+                            ts = (
+                                int(timestamp * 1000) if timestamp is not None else None
+                            )
+                            data = {
+                                "metricName": name,
+                                "metricValue": line.get(system_metric_name),
+                                "timestamp": ts,
+                                "step": step + 1,
+                                "epoch": None,
+                                "runContext": None,
+                            }
+                            metric_fp.write(json.dumps(data) + "\n")
+                    count += 1
+
+            if "summary-metrics" not in self.ignore:
+                # Next, log single-value from summary:
+                timestamp = None
+                for item in run.summary.keys():
+                    if item == "_timestamp":
+                        timestamp = run.summary["_timestamp"]
+                for item in run.summary.keys():
+                    if item.startswith("_"):
+                        continue
+
+                    value = get_json_value(run.summary[item])
+
+                    if isinstance(value, dict):
+                        if item == "boxes":
+                            self.annotations.append(value)
+                        continue
+
+                    fp.write(json.dumps({"metric": item, "count": count}) + "\n")
+                    filename = self.get_path(
+                        run, "metrics", filename="metric_%05d.jsonl" % count
+                    )
+                    with open(filename, "w") as metric_fp:
+                        print("        downloading summary metric %r..." % item)
                         ts = int(timestamp * 1000) if timestamp is not None else None
                         data = {
-                            "metricName": name,
-                            "metricValue": line.get(system_metric_name),
+                            "metricName": item,
+                            "metricValue": value,
                             "timestamp": ts,
-                            "step": step + 1,
+                            "step": None,
                             "epoch": None,
                             "runContext": None,
                         }
                         metric_fp.write(json.dumps(data) + "\n")
-                count += 1
+                    count += 1
 
-            # Next, log single-value from summary:
-            timestamp = None
-            for item in run.summary.keys():
-                if item == "_timestamp":
-                    timestamp = run.summary["_timestamp"]
-            for item in run.summary.keys():
-                if item.startswith("_"):
-                    continue
+            print("Gathering metrics...")
+            metrics = set()
+            histograms = set()
+            for row in run.history(pandas=False, samples=100):
+                print(".", end="")
+                for metric in row:
+                    if self.ignore_metric_name(metric):
+                        continue
 
-                value = get_json_value(run.summary[item])
+                    if isinstance(row[metric], dict):
+                        if (
+                            "_type" in row[metric]
+                            and row[metric]["_type"] == "histogram"
+                        ):
+                            histograms.add(metric)
+                    else:
+                        metrics.add(metric)
+            print("")
+            print("Done gathering metrics")
 
-                if isinstance(value, dict):
-                    if item == "boxes":
-                        self.annotations.append(value)
-                    continue
-
-                fp.write(json.dumps({"metric": item, "count": count}) + "\n")
-                filename = self.get_path(
-                    run, "metrics", filename="metric_%05d.jsonl" % count
-                )
-                with open(filename, "w") as metric_fp:
-                    print("        downloading summary metric %r..." % item)
-                    ts = int(timestamp * 1000) if timestamp is not None else None
-                    data = {
-                        "metricName": item,
-                        "metricValue": value,
-                        "timestamp": ts,
-                        "step": None,
-                        "epoch": None,
-                        "runContext": None,
-                    }
-                    metric_fp.write(json.dumps(data) + "\n")
-                count += 1
+            if "histogram_3d" not in self.ignore:
+                for histogram in histograms:
+                    self.download_histograms(run, histogram)
 
             for metric in metrics:
-                if self.ignore_metric_name(metric):
-                    continue
-                # Is it a metric?
-                if samples[metric] is None:
-                    continue
-                elif isinstance(samples[metric], dict):
-                    if (
-                        "_type" in samples[metric]
-                        and samples[metric]["_type"] == "histogram"
-                    ):
-                        self.download_histograms(run, metric)
-                    continue
                 fp.write(json.dumps({"metric": metric, "count": count}) + "\n")
-                self.download_metric_task(metric, run, count)
                 count += 1
+                self.download_metric_task(metric, run, count)
 
     def download_reports(self, workspace, project):
         if self.flat:
