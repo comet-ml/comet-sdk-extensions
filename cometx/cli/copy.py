@@ -67,6 +67,7 @@ import glob
 import io
 import json
 import os
+import re
 import sys
 import urllib.parse
 
@@ -494,6 +495,12 @@ class CopyManager:
             binary_io = filename
         else:
             binary_io = open(filename, "rb")
+
+        # If the filename has a sequence number:
+        sequence = re.search(r"\((\d+)\)$", log_filename)
+        if sequence:
+            log_filename = log_filename.rsplit("(", 1)[0].strip()
+
         result = experiment._log_asset(
             binary_io,
             file_name=log_filename,
@@ -501,7 +508,7 @@ class CopyManager:
             asset_type=asset_type,
             metadata=metadata,
             step=step,
-        )  # done!
+        )
         return result
 
     def _log_asset(
