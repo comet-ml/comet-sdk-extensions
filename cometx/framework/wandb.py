@@ -172,15 +172,20 @@ class DownloadManager:
         if args:
             self.parameters = []
             for key, value in args.items():
-                self.parameters.append(
-                    {
-                        "name": key,
-                        "valueMax": value,
-                        "valueMin": value,
-                        "valueCurrent": value,
-                        "editable": False,
-                    }
-                )
+                if isinstance(value, dict):
+                    self.download_asset_data(
+                        run, json.dumps(value), "parameter-cmd-%s.json" % key
+                    )
+                else:
+                    self.parameters.append(
+                        {
+                            "name": key,
+                            "valueMax": value,
+                            "valueMin": value,
+                            "valueCurrent": value,
+                            "editable": False,
+                        }
+                    )
 
     def download_file(self, path, file):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -409,6 +414,9 @@ class DownloadManager:
             others = {
                 "Name": run.name,
                 "origin": run.url,
+                "wandb_workspace": workspace,
+                "wandb_project": project,
+                "wandb_runid": experiment,
             }
             if "-run-" in run.name:
                 group, count = run.name.rsplit("-run-", 1)
@@ -494,7 +502,7 @@ class DownloadManager:
 
             # After all of the file downloads, log others:
             self.download_others(run, others)
-            self.download_hyper_parameters(run.config)
+            self.download_hyper_parameters(run)
             self.write_parameters(run)
             self.download_asset_metadata(run)
 
@@ -502,18 +510,23 @@ class DownloadManager:
         path = self.get_path(run, "run", filename="git_diff.patch")
         self.download_file_task(path, file)
 
-    def download_hyper_parameters(self, config):
+    def download_hyper_parameters(self, run):
         # FIXME: may need to unpack these, wandb delim "/"
-        for key, value in config.items():
-            self.parameters.append(
-                {
-                    "name": key,
-                    "valueMax": value,
-                    "valueMin": value,
-                    "valueCurrent": value,
-                    "editable": False,
-                }
-            )
+        for key, value in run.config.items():
+            if isinstance(value, dict):
+                self.download_asset_data(
+                    run, json.dumps(value), "parameter-%s.json" % key
+                )
+            else:
+                self.parameters.append(
+                    {
+                        "name": key,
+                        "valueMax": value,
+                        "valueMin": value,
+                        "valueCurrent": value,
+                        "editable": False,
+                    }
+                )
 
     def convert_histogram(self, data):
         if "bins" in data:
