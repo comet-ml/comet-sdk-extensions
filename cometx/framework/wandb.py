@@ -804,7 +804,11 @@ class DownloadManager:
                             self.annotations.append(value)
                         continue
 
-                    fp.write(json.dumps({"metric": item, "count": count}) + "\n")
+                    summary_metric_name = "summary/" + item
+                    fp.write(
+                        json.dumps({"metric": summary_metric_name, "count": count})
+                        + "\n"
+                    )
                     filename = self.get_path(
                         run, "metrics", filename="metric_%05d.jsonl" % count
                     )
@@ -812,7 +816,7 @@ class DownloadManager:
                         print("        downloading summary metric %r..." % item)
                         ts = int(timestamp * 1000) if timestamp is not None else None
                         data = {
-                            "metricName": item,
+                            "metricName": summary_metric_name,
                             "metricValue": value,
                             "timestamp": ts,
                             "step": None,
