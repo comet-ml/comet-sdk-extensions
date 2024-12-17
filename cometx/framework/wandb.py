@@ -851,8 +851,8 @@ class DownloadManager:
 
             for metric in metrics:
                 fp.write(json.dumps({"metric": metric, "count": count}) + "\n")
-                count += 1
                 self.download_metric_task(metric, run, count)
+                count += 1
 
     def download_reports(self, workspace, project):
         if self.flat:
