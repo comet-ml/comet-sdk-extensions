@@ -218,20 +218,20 @@ class DownloadManager:
         self.download_file_task(path, file)
 
     def download_image(self, run, file):
-        print("    downloading image...")
         filename = self.get_file_name(file)
+        print("    downloading image %r..." % filename)
         path = self.get_path(run, "assets", "image", filename=filename)
         self.download_file_task(path, file)
 
     def download_audio(self, run, file):
-        print("    downloading audio...")
         filename = self.get_file_name(file)
+        print("    downloading audio %r..." % filename)
         path = self.get_path(run, "assets", "audio", filename=filename)
         self.download_file_task(path, file)
 
     def download_video(self, run, file):
-        print("    downloading video...")
         filename = self.get_file_name(file)
+        print("    downloading video %r..." % filename)
         path = self.get_path(run, "assets", "video", filename=filename)
         self.download_file_task(path, file)
 
@@ -698,8 +698,11 @@ class DownloadManager:
                 run, "metrics", filename="metric_%05d.jsonl" % count
             )
             with open(filename, "w") as fp:
-                for row in run.scan_history(keys=[metric, "_step", "_timestamp"]):
+                for row in run.scan_history(
+                    keys=[metric, "_step", "_timestamp", "epoch"]
+                ):
                     step = row.get("_step", None)
+                    epoch = row.get("epoch", None)
                     timestamp = row.get("_timestamp", None)
                     value = row.get(metric, None)
                     if (
@@ -713,7 +716,7 @@ class DownloadManager:
                             "metricValue": value,
                             "timestamp": ts,
                             "step": step,
-                            "epoch": None,
+                            "epoch": epoch,
                             "runContext": None,
                         }
                         fp.write(json.dumps(data) + "\n")
@@ -809,8 +812,7 @@ class DownloadManager:
             print("Gathering metrics...")
             metrics = set()
             histograms = set()
-            for row in run.history(pandas=False, samples=100):
-                print(".", end="")
+            for row in run.scan_history():
                 for metric in row:
                     if self.ignore_metric_name(metric):
                         continue
