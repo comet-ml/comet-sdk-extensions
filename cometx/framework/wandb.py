@@ -22,11 +22,10 @@ from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import unquote
 
 import comet_ml
+import wandb
 from comet_ml.annotations import Box, Layer
 from comet_ml.cli_args_parse import _parse_cmd_args, _parse_cmd_args_naive
 from comet_ml.data_structure import Histogram
-
-import wandb
 
 from ..utils import download_url, remove_extra_slashes
 
@@ -82,7 +81,8 @@ class DownloadManager:
                 try:
                     file.download(root=tmpdir)
                     shutil.copy(os.path.join(tmpdir, file.name), path)
-                except Exception:
+                except Exception as exc:
+                    print(exc)
                     print(
                         "Unable to download %r to %r; skipping..." % (file.name, path)
                     )
@@ -177,20 +177,15 @@ class DownloadManager:
         if args:
             self.parameters = []
             for key, value in args.items():
-                if isinstance(value, dict):
-                    self.download_asset_data(
-                        run, json.dumps(value), "parameter-cmd-%s.json" % key
-                    )
-                else:
-                    self.parameters.append(
-                        {
-                            "name": key,
-                            "valueMax": value,
-                            "valueMin": value,
-                            "valueCurrent": value,
-                            "editable": False,
-                        }
-                    )
+                self.parameters.append(
+                    {
+                        "name": key,
+                        "valueMax": value,
+                        "valueMin": value,
+                        "valueCurrent": value,
+                        "editable": False,
+                    }
+                )
 
     def download_file(self, path, file):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -516,22 +511,16 @@ class DownloadManager:
         self.download_file_task(path, file)
 
     def download_hyper_parameters(self, run):
-        # FIXME: may need to unpack these, wandb delim "/"
-        for key, value in run.config.items():
-            if isinstance(value, dict):
-                self.download_asset_data(
-                    run, json.dumps(value), "parameter-%s.json" % key
-                )
-            else:
-                self.parameters.append(
-                    {
-                        "name": key,
-                        "valueMax": value,
-                        "valueMin": value,
-                        "valueCurrent": value,
-                        "editable": False,
-                    }
-                )
+        value = dict(run.config)
+        self.parameters.append(
+            {
+                "name": "config",
+                "valueMax": value,
+                "valueMin": value,
+                "valueCurrent": value,
+                "editable": False,
+            }
+        )
 
     def convert_histogram(self, data):
         if "bins" in data:
@@ -635,6 +624,7 @@ class DownloadManager:
 
     def download_artifact(self, run, file):
         _, artifact_id, artifact_name = file.name.split("/", 2)
+        artifact_name = clean_for_filename(artifact_name)
         path = self.get_path(run, "artifacts", artifact_id, filename=artifact_name)
         self.download_file_task(path, file)
 
@@ -849,7 +839,7 @@ class DownloadManager:
             print("")
             print("Done gathering metrics")
 
-            if "histogram_3d" not in self.ignore:
+            if "histogram_combined_3d" not in self.ignore:
                 for histogram in histograms:
                     self.download_histograms(run, histogram)
 
