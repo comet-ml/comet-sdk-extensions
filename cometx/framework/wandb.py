@@ -828,7 +828,8 @@ class DownloadManager:
                         ):
                             histograms.add(metric)
                     else:
-                        metrics.add(metric)
+                        if row[metric] is not None:
+                            metrics.add(metric)
             print("")
             print("Done gathering metrics")
 
