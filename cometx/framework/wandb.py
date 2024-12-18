@@ -106,19 +106,27 @@ class DownloadManager:
     def download(self, PATH):
         path = remove_extra_slashes(PATH)
         path_parts = path.split("/")
-        if len(path_parts) == 2:
+
+        if len(path_parts) == 1:
+            projects = []
+            workspace = path_parts[0]
+            for wandb_project in self.api.projects(workspace):
+                projects.append(wandb_project.name)
+            self.include_experiments = None
+        elif len(path_parts) == 2:
             workspace, project = path_parts
+            projects = [project]
             self.include_experiments = None
         elif len(path_parts) == 3:
             workspace, project, experiment = path_parts
+            projects = [project]
             self.include_experiments = [experiment]
         elif len(path_parts) == 4 and path_parts[2] == "runs":
             workspace, project, _, experiment = path_parts
             self.include_experiments = [experiment]
+            projects = [project]
         else:
             raise Exception("invalid PATH: %r" % PATH)
-
-        projects = [project]
 
         # Download items:
         for project in projects:
@@ -408,7 +416,7 @@ class DownloadManager:
                 continue
 
             print(
-                f"downloading run {run.name} to {workspace}/{project}/{experiment}..."
+                f"downloading run '{run.name}' to {workspace}/{project}/{experiment}..."
             )
             self.reset_run()
             others = {
@@ -534,12 +542,14 @@ class DownloadManager:
         return (bins, data["values"])
 
     def write_histogram(self, run, name, data):
+        if "histogram_combined_3d" in self.ignore:
+            return
         print("    downloading histogram...")
         values, counts = self.convert_histogram(data)
         histogram = Histogram()
         histogram.add(values=values, counts=counts)
         data_dict = {"histograms": [{"step": 0, "histogram": histogram.to_json()}]}
-        # FIXME: clean name for filename
+        name = clean_for_filename(name)
         path = self.get_path(
             run, "assets", "histogram_combined_3d", filename="%s_summary.json" % name
         )
@@ -794,7 +804,7 @@ class DownloadManager:
                         if item == "boxes":
                             self.annotations.append(value)
                             continue
-                        if value["_type"] in ["histogram"]:
+                        if "_type" in value and value["_type"] in ["histogram"]:
                             continue
 
                     summary[item] = value
