@@ -764,7 +764,7 @@ class DownloadManager:
                             else system_metric_name
                         )
                         name = name.replace("\\.", "")
-                        print("        downloading summary metric %r..." % name)
+                        print("        downloading system metric %r..." % name)
                         for step, line in enumerate(system_metrics):
                             timestamp = line["_timestamp"]
                             ts = (
@@ -783,10 +783,7 @@ class DownloadManager:
 
             if "summary-metrics" not in self.ignore:
                 # Next, log single-value from summary:
-                timestamp = None
-                for item in run.summary.keys():
-                    if item == "_timestamp":
-                        timestamp = run.summary["_timestamp"]
+                summary = {}
                 for item in run.summary.keys():
                     if item.startswith("_"):
                         continue
@@ -796,29 +793,15 @@ class DownloadManager:
                     if isinstance(value, dict):
                         if item == "boxes":
                             self.annotations.append(value)
-                        continue
+                            continue
+                        if value["_type"] in ["histogram"]:
+                            continue
 
-                    summary_metric_name = "summary/" + item
-                    fp.write(
-                        json.dumps({"metric": summary_metric_name, "count": count})
-                        + "\n"
-                    )
-                    filename = self.get_path(
-                        run, "metrics", filename="metric_%05d.jsonl" % count
-                    )
-                    with open(filename, "w") as metric_fp:
-                        print("        downloading summary metric %r..." % item)
-                        ts = int(timestamp * 1000) if timestamp is not None else None
-                        data = {
-                            "metricName": summary_metric_name,
-                            "metricValue": value,
-                            "timestamp": ts,
-                            "step": None,
-                            "epoch": None,
-                            "runContext": None,
-                        }
-                        metric_fp.write(json.dumps(data) + "\n")
-                    count += 1
+                    summary[item] = value
+
+                self.download_asset_data(
+                    run, json.dumps(summary), "summary_metrics.json"
+                )
 
             print("Gathering metrics...")
             metrics = set()
