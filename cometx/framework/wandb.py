@@ -22,14 +22,19 @@ from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import unquote
 
 import comet_ml
-import wandb
 from comet_ml.annotations import Box, Layer
 from comet_ml.cli_args_parse import _parse_cmd_args, _parse_cmd_args_naive
 from comet_ml.data_structure import Histogram
 
+import wandb
+
 from ..utils import download_url, remove_extra_slashes
 
 MAX_METRIC_SAMPLES = 15_000
+
+
+def clean_for_filename(name):
+    return name.replace("/", "-").replace(":", "")
 
 
 def get_json_value(item):
@@ -159,7 +164,7 @@ class DownloadManager:
         return "/".join(wandb_file.name.split("/")[:-1])
 
     def get_file_name(self, wandb_file):
-        file_name = wandb_file.name.split("/")[-1]
+        file_name = clean_for_filename(wandb_file.name.split("/")[-1])
         return file_name
 
     def download_cmd_parameters(self, run, args):
@@ -696,8 +701,7 @@ class DownloadManager:
                 data_dict["histograms"].append(
                     {"step": step, "histogram": histogram.to_json()}
                 )
-        # FIXME: clean name for filename
-        name = name.replace("/", "-")
+        name = clean_for_filename(name)
         path = self.get_path(
             run, "assets", "histogram_combined_3d", filename="%s_history.json" % name
         )
