@@ -259,7 +259,7 @@ def _log_mpm_training_distribution(MPM: any, nb_events: int) -> None:
         )
 
 
-def test_mpm(api, workspace: str, model_name: str, nb_events: int, days: int):
+def mpm_test(api, workspace: str, model_name: str, nb_events: int, days: int):
     """
     Args:
         workspace (str): workspace
@@ -293,7 +293,7 @@ def test_mpm(api, workspace: str, model_name: str, nb_events: int, days: int):
     MPM.end()
 
 
-def test_experiment(
+def experiment_test(
     includes: List[str],
     workspace: str,
     project_name: str,
@@ -395,7 +395,7 @@ def test_experiment(
     return key
 
 
-def test_optimizer(workspace: str, project_name: str):
+def optimizer_test(workspace: str, project_name: str):
     """
     Args:
         workspace (str): workspace
@@ -477,7 +477,7 @@ def smoke_test(parsed_args, remaning=None) -> None:
         pprint("    Attempting to log experiment...", "info")
         project_data = api.get_project(workspace, project_name) or {}
         # Test Experiment
-        key = test_experiment(
+        key = experiment_test(
             includes,
             workspace,
             project_name,
@@ -528,7 +528,7 @@ def smoke_test(parsed_args, remaning=None) -> None:
     ):
         pprint("    Attempting to run optimizer...", "info")
         os.environ["COMET_OPTIMIZER_URL"] = comet_base_url + "/optimizer/"
-        test_optimizer(
+        optimizer_test(
             workspace=workspace,
             project_name=project_name,
         )
@@ -539,7 +539,7 @@ def smoke_test(parsed_args, remaning=None) -> None:
 
     if "mpm" in includes or any(value in includes for value in RESOURCES["mpm"]):
         pprint("    Attempting to run mpm tests...", "info")
-        test_mpm(api, workspace, project_name, nb_events=10, days=7)
+        mpm_test(api, workspace, project_name, nb_events=10, days=7)
 
         comet_mpm_ui_url = comet_base_url + f"/{workspace}#model-production-monitoring"
         pprint(
