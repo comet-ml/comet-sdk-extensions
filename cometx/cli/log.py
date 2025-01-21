@@ -62,17 +62,22 @@ ADDITIONAL_ARGS = False
 # From filename extension to Comet Asset Type
 EXTENSION_MAP = {
     "asset": "asset",
+    "avi": "video",
     "datagrid": "datagrid",
-    "png": "image",
-    "jpg": "image",
     "gif": "image",
-    "txt": "text-sample",
-    "webm": "video",
-    "mp4": "video",
-    "ogg": "video",
     "ipynb": "notebook",
-    "wav": "audio",
+    "jpg": "image",
     "mp3": "audio",
+    "mp4": "video",
+    "mpeg": "video",
+    "mpg": "video",
+    "mpv": "video",
+    "ogg": "video",
+    "ogv": "video",
+    "png": "image",
+    "txt": "text-sample",
+    "wav": "audio",
+    "webm": "video",
     #    "curve": "curve", FIXME: add
 }
 # Fom CLI type to Comet Asset Type
@@ -121,6 +126,12 @@ def get_parser_arguments(parser):
     )
     parser.add_argument(
         "--debug", help="If given, allow debugging", default=False, action="store_true"
+    )
+    parser.add_argument(
+        "--use-base-name",
+        help="If given, using the basename for logging assets",
+        default=False,
+        action="store_true",
     )
 
 
@@ -246,16 +257,20 @@ def log_cli(parsed_args):
 
         for experiment in experiments:
             for filename in parsed_args.FILENAME:
-                log_experiment_assets_from_file(experiment, filename, parsed_args.type)
+                log_experiment_assets_from_file(
+                    experiment, filename, parsed_args.type, parsed_args.use_base_name
+                )
 
     for experiment in experiments:
         experiment.end()
 
 
-def log_experiment_assets_from_file(experiment, filename, file_type):
+def log_experiment_assets_from_file(experiment, filename, file_type, use_base_name):
     SKELETON = filename
+    base_name = os.path.basename(filename) if use_base_name else filename
     for filename in glob.glob(SKELETON):
         extension = get_file_extension(filename).lower()
+        # FIXME: These types do not respect use_base_name
         if extension == "off":
             log_points_3d_off_file(experiment, filename)
         elif extension == "pcd":
@@ -263,13 +278,19 @@ def log_experiment_assets_from_file(experiment, filename, file_type):
         elif extension == "xyz":
             log_points_3d_xyz_file(experiment, filename)
         else:
-            if not file_type:
+            if file_type is None or file_type in ["asset", ""]:
                 file_type = EXTENSION_MAP.get(extension, "asset")
 
             # metadata = FIXME: get metadata dict from args
-            experiment.log_asset(
-                filename,
+            experiment._api._client.log_experiment_asset(
+                experiment.id,
+                file_data=filename,
+                file_name=base_name,
                 ftype=file_type,
+                step=None,
+                overwrite=None,
+                context=None,
+                metadata=None,
             )
 
 

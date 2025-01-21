@@ -274,7 +274,9 @@ class DownloadManager:
         print("    downloading code...")
         filepath = self.get_file_path(file)
         filename = self.get_file_name(file)
-        # NOTE: filepath contains "code/"
+        # NOTE: filepath starts with "code"
+        if not filepath.startswith("code"):
+            filepath = os.path.join("code", filepath)
         path = self.get_path(run, "run", filepath, filename=filename)
         self.download_file_task(path, file)
 
@@ -436,6 +438,14 @@ class DownloadManager:
             # Handle all of the specific run items below:
             if "metrics" not in self.ignore:
                 self.download_metrics(run)
+
+            for artifact in run.logged_artifacts():
+                if artifact.type == "code":
+                    for file in list(artifact.files()):
+                        self.download_code(run, file)
+                else:
+                    for file in list(artifact.files()):
+                        self.download_asset(run, file)
 
             for file in list(run.files()):
                 path = self.get_file_path(file)
