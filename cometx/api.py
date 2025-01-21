@@ -11,6 +11,7 @@
 #      Team. All rights reserved.
 # ****************************************
 
+import os
 import tempfile
 from typing import Any, Dict, List
 from urllib.parse import urlparse
@@ -126,6 +127,11 @@ class API(API):
             fp.write(results)
         return filename
 
+    def upload_panel(self, workspace, name):
+        # Upload well-known panel names
+        url = f"https://raw.githubusercontent.com/comet-ml/comet-examples/master/panels/{name}.py"
+        return self.upload_panel_url(workspace, url)
+
     def upload_panel_url(self, workspace, item):
         """
         Upload a panel from a URL.
@@ -142,8 +148,9 @@ class API(API):
         if parsed_url.path.endswith(".py"):
             code = response.content.decode()
             print("   Creating zipped code...")
-            filename = create_panel_zip(parsed_url.path, code)
-            print("   Uploading panel...")
+            nice_name = os.path.splitext(os.path.basename(parsed_url.path))[0]
+            filename = create_panel_zip(nice_name, code)
+            print("   Uploading panel %r..." % nice_name)
             self.upload_panel_zip(workspace, filename)
         elif parsed_url.path.endswith(".zip"):
             zipcontents = response.content

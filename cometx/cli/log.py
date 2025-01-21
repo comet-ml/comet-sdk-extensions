@@ -179,9 +179,10 @@ def log_cli(parsed_args):
                 print("Reading contents of zip file...")
                 with open(item) as fp:
                     code = fp.read()
+                nice_name = os.path.splitext(os.path.basename(item))[0]
                 print("Creating zipped code...")
-                filename = create_panel_zip(item, code)
-                print("Uploading panel...")
+                filename = create_panel_zip(nice_name, code)
+                print("Uploading panel %r..." % nice_name)
                 api.upload_panel_zip(workspace, filename)
             else:
                 raise Exception("Unknown panel type")
