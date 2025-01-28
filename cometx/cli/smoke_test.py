@@ -35,6 +35,7 @@ Items to include or exclude:
 * optimizer
 * mpm
 * panel
+* opik
 * experiment
   * metric
   * image
@@ -48,6 +49,7 @@ import csv
 import datetime
 import os
 import random
+import string
 import sys
 import tempfile
 import time
@@ -71,6 +73,7 @@ RESOURCES = {
     "optimizer": [],
     "mpm": [],
     "panel": [],
+    "opik": [],
 }
 RESOURCES_ALL = sorted(
     list(RESOURCES.keys()) + [value for v in RESOURCES.values() for value in v]
@@ -434,6 +437,49 @@ def optimizer_test(workspace: str, project_name: str):
 
     pprint("Optimizer job done! Completed %d experiments." % count, "good")
 
+def opik_test(workspace: str, project_name: str, comet_base_url: str, api: API):
+    try:
+        import opik
+    except ImportError:
+        pprint(
+            "opik not installed; run `pip install opik` to install it",
+            "error",
+        )
+        pprint("Skipping opik tests", "error")
+        return
+    
+    opik_api_key = api.config["comet.api_key"]
+    if not opik_api_key:
+        pprint("Opik API key is missing in API configuration.", "error")
+        return
+    
+    def generate_random_string(length=100):
+        return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
+    
+    pprint("Starting Opik sanity test...", "info")
+
+    pprint(f"Comet base url: {comet_base_url}")
+    pprint(f"opik_api_key: {opik_api_key}")
+
+    opik_url_override = comet_base_url + "/opik/api/"
+    pprint(f"Opik URL override: {opik_url_override}", "info")
+
+    random_data = {f"key_{i}": generate_random_string() for i in range(10)}
+
+    try:
+        client = opik.Opik(
+            project_name=project_name,
+            workspace=workspace,
+            api_key=opik_api_key,
+            base_url=opik_url_override
+        )
+        trace = client.trace(name='trace-1')
+        trace.update(input=random_data)
+        trace.end()
+        client.end()
+        pprint("Opik sanity test completed successfully.", "good")
+    except Exception as e:
+        pprint(f"Opik test failed: {e}", "error")
 
 def smoke_test(parsed_args, remaning=None) -> None:
     """
@@ -449,6 +495,8 @@ def smoke_test(parsed_args, remaning=None) -> None:
         comet_base_url = comet_base_url[:-10]
 
     includes = parsed_args.include if parsed_args.include else list(RESOURCES.keys())
+    # pprint(f"Initial includes: {includes}", "info")
+    # pprint(f"Excludes: {parsed_args.exclude}", "info")
     for item in parsed_args.exclude:
         if item in includes:
             includes.remove(item)
@@ -546,6 +594,9 @@ def smoke_test(parsed_args, remaning=None) -> None:
             f"\nCompleted MPM test, you will need to check the MPM UI ({comet_mpm_ui_url}) to validate the data has been logged, this can take up to 5 minutes.\n",
             "good",
         )
+
+    if "opik" in includes:
+        opik_test(workspace, project_name, comet_base_url, api)
 
     pprint("All tests have completed", "info")
 
