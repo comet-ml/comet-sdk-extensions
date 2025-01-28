@@ -45,6 +45,7 @@ Items to include or exclude:
   * embedding
 """
 import argparse
+import configparser
 import csv
 import datetime
 import os
@@ -110,6 +111,17 @@ def get_parser_arguments(parser):
         default=False,
     )
 
+def get_opik_config():
+    config = configparser.ConfigParser()
+
+    config_path = os.path.expanduser("~/.opik.config")
+
+    if os.path.exists(config_path):
+        config.read(config_path)
+        if "opik" in config and "url_override" in config["opik"]:
+            return config["opik"]["url_override"]
+    
+    return os.getenv("OPIK_URL_OVERRIDE", None)
 
 def pprint(text: str, level: str = "info") -> None:
     """
@@ -437,7 +449,7 @@ def optimizer_test(workspace: str, project_name: str):
 
     pprint("Optimizer job done! Completed %d experiments." % count, "good")
 
-def opik_test(workspace: str, project_name: str, comet_base_url: str, api: API):
+def opik_test(workspace: str, project_name: str, api: API):
     try:
         import opik
     except ImportError:
@@ -448,6 +460,10 @@ def opik_test(workspace: str, project_name: str, comet_base_url: str, api: API):
         pprint("Skipping opik tests", "error")
         return
     
+    opik_url_override = get_opik_config()
+    if not opik_url_override:
+        pprint("Opik URL override is missing. Ensure it's set in ~/.opik.config or OPIK_URL_OVERRIDE.", "error")
+
     opik_api_key = api.config["comet.api_key"]
     if not opik_api_key:
         pprint("Opik API key is missing in API configuration.", "error")
@@ -458,10 +474,6 @@ def opik_test(workspace: str, project_name: str, comet_base_url: str, api: API):
     
     pprint("Starting Opik sanity test...", "info")
 
-    pprint(f"Comet base url: {comet_base_url}")
-    pprint(f"opik_api_key: {opik_api_key}")
-
-    opik_url_override = comet_base_url + "/opik/api/"
     pprint(f"Opik URL override: {opik_url_override}", "info")
 
     random_data = {f"key_{i}": generate_random_string() for i in range(10)}
@@ -471,7 +483,6 @@ def opik_test(workspace: str, project_name: str, comet_base_url: str, api: API):
             project_name=project_name,
             workspace=workspace,
             api_key=opik_api_key,
-            base_url=opik_url_override
         )
         trace = client.trace(name='trace-1')
         trace.update(input=random_data)
@@ -596,7 +607,7 @@ def smoke_test(parsed_args, remaning=None) -> None:
         )
 
     if "opik" in includes:
-        opik_test(workspace, project_name, comet_base_url, api)
+        opik_test(workspace, project_name, api)
 
     pprint("All tests have completed", "info")
 
