@@ -294,7 +294,7 @@ def mpm_test(api, workspace: str, model_name: str, nb_events: int, days: int):
             "error",
         )
         pprint("Skipping mpm tests", "error")
-        return
+        return False
 
     MPM = comet_mpm.CometMPM(
         workspace_name=workspace,
@@ -313,6 +313,7 @@ def mpm_test(api, workspace: str, model_name: str, nb_events: int, days: int):
     # Call .end() method to make sure all data is logged to the platform
     MPM.end()
 
+    return True
 
 def experiment_test(
     includes: List[str],
@@ -469,8 +470,6 @@ def opik_test(workspace: str, project_name: str, api: API):
     comet_base_url = api.config["comet.url_override"].rstrip("/")
     opik_url_override = get_opik_config(comet_base_url)
 
-    pprint(f"Opik URL override: {opik_url_override}", "info")
-
     if not opik_url_override:
         pprint("Opik URL override is missing. Ensure it's set in ~/.opik.config or OPIK_URL_OVERRIDE.", "error")
 
@@ -608,13 +607,13 @@ def smoke_test(parsed_args, remaning=None) -> None:
 
     if "mpm" in includes or any(value in includes for value in RESOURCES["mpm"]):
         pprint("    Attempting to run mpm tests...", "info")
-        mpm_test(api, workspace, project_name, nb_events=10, days=7)
 
-        comet_mpm_ui_url = comet_base_url + f"/{workspace}#model-production-monitoring"
-        pprint(
-            f"\nCompleted MPM test, you will need to check the MPM UI ({comet_mpm_ui_url}) to validate the data has been logged, this can take up to 5 minutes.\n",
-            "good",
-        )
+        if mpm_test(api, workspace, project_name, nb_events=10, days=7):
+            comet_mpm_ui_url = comet_base_url + f"/{workspace}#model-production-monitoring"
+            pprint(
+                f"\nCompleted MPM test, you will need to check the MPM UI ({comet_mpm_ui_url}) to validate the data has been logged, this can take up to 5 minutes.\n",
+                "good",
+            )
 
     if "opik" in includes:
         opik_test(workspace, project_name, api)
