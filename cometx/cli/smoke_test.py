@@ -56,6 +56,7 @@ import tempfile
 import time
 import uuid
 from typing import List
+from urllib.parse import urljoin
 
 from comet_ml import Experiment, Optimizer
 
@@ -111,7 +112,7 @@ def get_parser_arguments(parser):
         default=False,
     )
 
-def get_opik_config():
+def get_opik_config(comet_base_url: str):
     config = configparser.ConfigParser()
 
     config_path = os.path.expanduser("~/.opik.config")
@@ -121,7 +122,12 @@ def get_opik_config():
         if "opik" in config and "url_override" in config["opik"]:
             return config["opik"]["url_override"]
     
-    return os.getenv("OPIK_URL_OVERRIDE", None)
+    env_url = os.getenv("OPIK_URL_OVERRIDE")
+    if env_url:
+        return env_url 
+
+    return urljoin(comet_base_url + "/", "opik/api/")
+
 
 def pprint(text: str, level: str = "info") -> None:
     """
@@ -454,13 +460,17 @@ def opik_test(workspace: str, project_name: str, api: API):
         import opik
     except ImportError:
         pprint(
-            "opik not installed; run `pip install opik` to install it",
+            "Opik not installed",
             "error",
         )
         pprint("Skipping opik tests", "error")
         return
     
-    opik_url_override = get_opik_config()
+    comet_base_url = api.config["comet.url_override"].rstrip("/")
+    opik_url_override = get_opik_config(comet_base_url)
+
+    pprint(f"Opik URL override: {opik_url_override}", "info")
+
     if not opik_url_override:
         pprint("Opik URL override is missing. Ensure it's set in ~/.opik.config or OPIK_URL_OVERRIDE.", "error")
 
