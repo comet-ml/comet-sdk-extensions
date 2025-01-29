@@ -35,6 +35,7 @@ Items to include or exclude:
 * optimizer
 * mpm
 * panel
+* opik
 * experiment
   * metric
   * image
@@ -44,15 +45,18 @@ Items to include or exclude:
   * embedding
 """
 import argparse
+import configparser
 import csv
 import datetime
 import os
 import random
+import string
 import sys
 import tempfile
 import time
 import uuid
 from typing import List
+from urllib.parse import urljoin
 
 from comet_ml import Experiment, Optimizer
 
@@ -71,6 +75,7 @@ RESOURCES = {
     "optimizer": [],
     "mpm": [],
     "panel": [],
+    "opik": [],
 }
 RESOURCES_ALL = sorted(
     list(RESOURCES.keys()) + [value for v in RESOURCES.values() for value in v]
@@ -106,6 +111,22 @@ def get_parser_arguments(parser):
         help=("Show debugging information"),
         default=False,
     )
+
+def get_opik_config(comet_base_url: str):
+    config = configparser.ConfigParser()
+
+    config_path = os.path.expanduser("~/.opik.config")
+
+    if os.path.exists(config_path):
+        config.read(config_path)
+        if "opik" in config and "url_override" in config["opik"]:
+            return config["opik"]["url_override"]
+    
+    env_url = os.getenv("OPIK_URL_OVERRIDE")
+    if env_url:
+        return env_url 
+
+    return urljoin(comet_base_url + "/", "opik/api/")
 
 
 def pprint(text: str, level: str = "info") -> None:
@@ -273,7 +294,7 @@ def mpm_test(api, workspace: str, model_name: str, nb_events: int, days: int):
             "error",
         )
         pprint("Skipping mpm tests", "error")
-        return
+        return False
 
     MPM = comet_mpm.CometMPM(
         workspace_name=workspace,
@@ -292,6 +313,7 @@ def mpm_test(api, workspace: str, model_name: str, nb_events: int, days: int):
     # Call .end() method to make sure all data is logged to the platform
     MPM.end()
 
+    return True
 
 def experiment_test(
     includes: List[str],
@@ -434,6 +456,50 @@ def optimizer_test(workspace: str, project_name: str):
 
     pprint("Optimizer job done! Completed %d experiments." % count, "good")
 
+def opik_test(workspace: str, project_name: str, api: API):
+    try:
+        import opik
+    except ImportError:
+        pprint(
+            "Opik not installed",
+            "error",
+        )
+        pprint("Skipping opik tests", "error")
+        return
+    
+    comet_base_url = api.config["comet.url_override"].rstrip("/")
+    opik_url_override = get_opik_config(comet_base_url)
+
+    if not opik_url_override:
+        pprint("Opik URL override is missing. Ensure it's set in ~/.opik.config or OPIK_URL_OVERRIDE.", "error")
+
+    opik_api_key = api.config["comet.api_key"]
+    if not opik_api_key:
+        pprint("Opik API key is missing in API configuration.", "error")
+        return
+    
+    def generate_random_string(length=100):
+        return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
+    
+    pprint("Starting Opik sanity test...", "info")
+
+    pprint(f"Opik URL override: {opik_url_override}", "info")
+
+    random_data = {f"key_{i}": generate_random_string() for i in range(10)}
+
+    try:
+        client = opik.Opik(
+            project_name=project_name,
+            workspace=workspace,
+            api_key=opik_api_key,
+        )
+        trace = client.trace(name='trace-1')
+        trace.update(input=random_data)
+        trace.end()
+        client.end()
+        pprint("Opik sanity test completed successfully.", "good")
+    except Exception as e:
+        pprint(f"Opik test failed: {e}", "error")
 
 def smoke_test(parsed_args, remaning=None) -> None:
     """
@@ -449,6 +515,8 @@ def smoke_test(parsed_args, remaning=None) -> None:
         comet_base_url = comet_base_url[:-10]
 
     includes = parsed_args.include if parsed_args.include else list(RESOURCES.keys())
+    # pprint(f"Initial includes: {includes}", "info")
+    # pprint(f"Excludes: {parsed_args.exclude}", "info")
     for item in parsed_args.exclude:
         if item in includes:
             includes.remove(item)
@@ -539,13 +607,16 @@ def smoke_test(parsed_args, remaning=None) -> None:
 
     if "mpm" in includes or any(value in includes for value in RESOURCES["mpm"]):
         pprint("    Attempting to run mpm tests...", "info")
-        mpm_test(api, workspace, project_name, nb_events=10, days=7)
 
-        comet_mpm_ui_url = comet_base_url + f"/{workspace}#model-production-monitoring"
-        pprint(
-            f"\nCompleted MPM test, you will need to check the MPM UI ({comet_mpm_ui_url}) to validate the data has been logged, this can take up to 5 minutes.\n",
-            "good",
-        )
+        if mpm_test(api, workspace, project_name, nb_events=10, days=7):
+            comet_mpm_ui_url = comet_base_url + f"/{workspace}#model-production-monitoring"
+            pprint(
+                f"\nCompleted MPM test, you will need to check the MPM UI ({comet_mpm_ui_url}) to validate the data has been logged, this can take up to 5 minutes.\n",
+                "good",
+            )
+
+    if "opik" in includes:
+        opik_test(workspace, project_name, api)
 
     pprint("All tests have completed", "info")
 

@@ -45,7 +45,12 @@ setup_args = dict(
     description="Python tools for Comet",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    install_requires=["comet_ml"],
+    install_requires=[
+        "comet_ml",
+        "pillow",
+        "opik",
+        "comet_mpm",
+        ],
     packages=[
         "cometx.cli",
         "cometx.tools",
