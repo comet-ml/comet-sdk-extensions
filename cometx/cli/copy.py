@@ -69,7 +69,9 @@ import json
 import os
 import re
 import sys
+import tempfile
 import urllib.parse
+import zipfile
 
 from comet_ml import APIExperiment, Artifact, Experiment, OfflineExperiment
 from comet_ml._typing import TemporaryFilePath
@@ -511,6 +513,56 @@ class CopyManager:
         )
         return result
 
+    def update_datagrid_contents(
+        self,
+        experiment,
+        asset_map,
+        metadata,
+        step,
+        zip_file_path,
+        log_as_filename,
+        old_asset_id,
+    ):
+        """
+        Take a datagrid zip, and replace the asset IDs with new
+        asset IDs.
+        """
+        basename = os.path.basename(zip_file_path)
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            file_to_edit = None
+            with zipfile.ZipFile(zip_file_path, "r") as zip_ref:
+                for file in zip_ref.namelist():
+                    file_to_edit = file
+                zip_ref.extractall(tmp_dir)
+
+            file_path = os.path.join(tmp_dir, file_to_edit)
+            print(file_path)
+            with open(file_path, "r") as fp:
+                json_data = json.load(fp)
+                asset_columns = []
+                for i, column in enumerate(json_data["columns"]):
+                    if json_data["columns"][column] == "IMAGE-ASSET":
+                        asset_columns.append(i)
+                for row in json_data["rows"]:
+                    for column in asset_columns:
+                        old = row[column]["asset_id"]
+                        row[column]["asset_id"] = asset_map[old]
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            file_path = os.path.join(tmp_dir, basename)
+            with open(file_path, "wb") as fp:
+                with zipfile.ZipFile(fp, "w", zipfile.ZIP_DEFLATED) as zfp:
+                    zfp.writestr(file_to_edit, json.dumps(json_data))
+            result = self._log_asset_filename(
+                experiment,
+                "datagrid",
+                metadata,
+                file_path,
+                step,
+                log_as_filename,
+            )
+            asset_map[old_asset_id] = result["assetId"]
+
     def _log_asset(
         self, experiment, path, asset_type, log_filename, assets_metadata, asset_map
     ):
@@ -604,6 +656,16 @@ class CopyManager:
                 log_as_filename or log_filename,
             )
             asset_map[old_asset_id] = result["assetId"]
+        elif asset_type == "datagrid":
+            self.update_datagrid_contents(
+                experiment,
+                asset_map,
+                metadata,
+                step,
+                filename,
+                log_as_filename or log_filename,
+                old_asset_id,
+            )
         elif asset_type == "confusion-matrix":
             # This will come after contained assets
             with open(filename) as fp:
@@ -660,7 +722,7 @@ class CopyManager:
         # Process all of the non-nested assets first:
         for log_filename in assets_metadata:
             asset_type = assets_metadata[log_filename].get("type", "asset") or "asset"
-            if asset_type not in ["confusion-matrix", "embeddings"]:
+            if asset_type not in ["confusion-matrix", "embeddings", "datagrid"]:
                 self._log_asset(
                     experiment,
                     path,
@@ -672,7 +734,7 @@ class CopyManager:
         # Process all nested assets:
         for log_filename in assets_metadata:
             asset_type = assets_metadata[log_filename].get("type", "asset") or "asset"
-            if asset_type in ["confusion-matrix", "embeddings"]:
+            if asset_type in ["confusion-matrix", "embeddings", "datagrid"]:
                 self._log_asset(
                     experiment,
                     path,

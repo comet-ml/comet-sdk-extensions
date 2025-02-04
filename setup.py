@@ -40,7 +40,7 @@ with io.open(os.path.join(HERE, "README.md"), encoding="utf8") as fh:
 setup_args = dict(
     name="cometx",
     version=__version__,
-    url="https://github.com/comet-ml/comet-sdk-extensions/",
+    url="https://github.com/comet-ml/cometx/",
     author="cometx development team",
     description="Python tools for Comet",
     long_description=long_description,
@@ -50,7 +50,7 @@ setup_args = dict(
         "pillow",
         "opik",
         "comet_mpm",
-        ],
+    ],
     packages=[
         "cometx.cli",
         "cometx.tools",

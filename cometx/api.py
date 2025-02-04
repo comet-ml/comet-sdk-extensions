@@ -127,9 +127,18 @@ class API(API):
             fp.write(results)
         return filename
 
-    def upload_panel(self, workspace, name):
+    def upload_panel_name(self, name):
         # Upload well-known panel names
-        url = f"https://raw.githubusercontent.com/comet-ml/comet-examples/master/panels/{name}.py"
+        workspace = self.get_default_workspace()
+        url = f"https://raw.githubusercontent.com/comet-ml/comet-examples/master/panels/{name}/{name}.py"
+        return self.upload_panel_url(workspace, url)
+
+    def upload_panel(self, workspace=None, name=None):
+        # Upload well-known panel names
+        if name is None:
+            raise Exception("Missing panel name to api.upload_panel(name='Name')")
+        workspace = workspace if workspace is not None else self.get_default_workspace()
+        url = f"https://raw.githubusercontent.com/comet-ml/comet-examples/master/panels/{name}/{name}.py"
         return self.upload_panel_url(workspace, url)
 
     def upload_panel_url(self, workspace, item):

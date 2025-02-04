@@ -196,7 +196,8 @@ def log_cli(parsed_args):
                 print("Uploading panel %r..." % nice_name)
                 api.upload_panel_zip(workspace, filename)
             else:
-                raise Exception("Unknown panel type")
+                # Assume it is a well-known panel name
+                api.upload_panel(workspace=workspace, name=item)
 
     elif parsed_args.type == "code":
         if not parsed_args.FILENAME:
